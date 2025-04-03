@@ -1,0 +1,70 @@
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, create_engine
+from sqlalchemy.orm import declarative_base, relationship
+from datetime import datetime
+
+# DB 연결 설정 (Kakao MySQL, DB 이름: capston)
+DATABASE_URL = (
+    "mysql+pymysql://admin:admin1234@"
+    "az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5."
+    "mysql.managed-service.kr-central-2.kakaocloud.com:3306/capston"
+)
+
+engine = create_engine(DATABASE_URL)
+Base = declarative_base()
+
+# 테이블 정의
+
+# 1. 최신 거래량 기준 주식 데이터 테이블
+class MostActiveStock(Base):
+    __tablename__ = "most_active_stock"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String(20), nullable=False)  # 주식 코드
+    name = Column(String(255), nullable=False)     # 기업 이름
+    price = Column(String(20), nullable=False)       # 현재가 (쉼표, 단위 등 포함)
+    volume = Column(String(50), nullable=False)      # 거래량
+    date = Column(Date, nullable=False)              # 크롤링한 날짜
+    created_at = Column(DateTime, default=datetime.utcnow)  # 저장 시각
+
+    # 연관 관계 설정
+    price_history = relationship("StockPriceHistory", back_populates="stock", cascade="all, delete-orphan")
+    favorites = relationship("Favorite", back_populates="stock", cascade="all, delete-orphan")
+
+# 2. 주식 가격 변동 기록 테이블
+class StockPriceHistory(Base):
+    __tablename__ = "stock_price_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    stock_id = Column(Integer, ForeignKey("most_active_stock.id"), nullable=False)
+    price = Column(String(20), nullable=False)  # 가격 정보 (문자열로 저장)
+    recorded_at = Column(DateTime, default=datetime.utcnow)  # 기록 시각
+
+    # 역참조 관계
+    stock = relationship("MostActiveStock", back_populates="price_history")
+
+# 3. 사용자 테이블
+class User(Base):
+    __tablename__ = "user"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
+
+# 4. 즐겨찾기 테이블 (사용자와 주식 간 다대다 관계)
+class Favorite(Base):
+    __tablename__ = "favorite"
+
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)
+    stock_id = Column(Integer, ForeignKey("most_active_stock.id"), primary_key=True)
+    favorited_at = Column(DateTime, default=datetime.utcnow)  # 즐겨찾기 등록 시각
+
+    user = relationship("User", back_populates="favorites")
+    stock = relationship("MostActiveStock", back_populates="favorites")
+
+# 테이블 생성 실행
+Base.metadata.create_all(bind=engine)
+print("✅ capston 데이터베이스에 모든 테이블이 성공적으로 생성되었습니다.")
