@@ -35,7 +35,7 @@ class User(Base):
 class Favorite(Base):
     __tablename__ = "favorite"
     
-    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)  # User.id 참조, 컬럼명은 user_id
+    user_id = Column(Integer, ForeignKey("user.id"), primary_key=True)  # User.id를 참조, 컬럼명: user_id
     company_name = Column(String(255), ForeignKey("top_stock.company_name"), primary_key=True)
     subscriptoin = Column(Boolean, default=False)   # 즐겨찾기 여부 (기본 false)
     notification = Column(Boolean, default=False)    # 알림 설정 여부 (기본 false)
