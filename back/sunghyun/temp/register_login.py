@@ -1,4 +1,3 @@
-# register_login.py
 import json
 from flask import Flask, request, Response
 from sqlalchemy import create_engine
@@ -8,17 +7,11 @@ from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import Base   # 미리 정의된 Base
-from models import User      # User 모델 예시: 
-#   class User(Base):
-#       __tablename__ = "user"
-#       user_name = Column(String(50), primary_key=True)
-#       user_passworkd = Column(String(255), nullable=False)
-#       user_email = Column(String(100), unique=True, nullable=False)
-#       created_at = Column(DateTime, default=datetime.utcnow)
+from models import User, Favorite  # User, Favorite 모델 (Favorite는 TopStock과의 관계를 통해 company_name 필드를 갖습니다.)
 
 app = Flask(__name__)
 
-# DB 연결 설정 (예: DB 이름 stock_data)
+# DB 연결 설정 (예: DB 이름 capston)
 DATABASE_URL = (
     "mysql+pymysql://admin:admin1234@"
     "az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5."
@@ -40,21 +33,21 @@ def json_response(data, status=200):
     )
 
 # ------------------------------
-#  회원가입 API
+# 회원가입 API (/register)
 # ------------------------------
 @app.route("/register", methods=["POST"])
 def register():
     """
     클라이언트는 암호화된 JSON 데이터를 전송합니다.
     
-    예시 - 암호화 전 원본 데이터:
+    원본 데이터 예시 (암호화 대상):
     {
-      "user_name": "john_doe",
-      "user_email": "john@example.com",
+      "user_name": "john_doe_new",
+      "user_email": "john_new@example.com",
       "user_password": "mypassword"
     }
     
-    클라이언트는 이 데이터를 암호화하여 다음과 같이 전송합니다.
+    전송 데이터 예시:
     {
       "encrypted_data": "<암호화된 문자열>"
     }
@@ -64,7 +57,6 @@ def register():
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
     
     try:
-        # 암호화된 문자열을 복호화하여 원본 JSON 문자열을 얻음
         encrypted_text = data["encrypted_data"]
         decrypted_bytes = fernet.decrypt(encrypted_text.encode())
         decrypted_str = decrypted_bytes.decode("utf-8")
@@ -84,7 +76,7 @@ def register():
     
     session = SessionLocal()
     try:
-        # 중복 체크
+        # user_name 중복 체크
         existing_user = session.query(User).filter_by(user_name=user_name).first()
         if existing_user:
             return json_response({"error": "이미 사용 중인 user_name입니다."}, 400)
@@ -106,20 +98,20 @@ def register():
         session.close()
 
 # ------------------------------
-#  로그인 API
+# 로그인 API (/login)
 # ------------------------------
 @app.route("/login", methods=["POST"])
 def login():
     """
     클라이언트는 암호화된 JSON 데이터를 전송합니다.
     
-    예시 - 암호화 전 원본 데이터:
+    원본 데이터 예시 (암호화 대상):
     {
-      "user_name": "john_doe",
+      "user_name": "john_doe_new",
       "user_password": "mypassword"
     }
     
-    클라이언트는 이 데이터를 암호화하여 다음과 같이 전송합니다.
+    전송 데이터 예시:
     {
       "encrypted_data": "<암호화된 문자열>"
     }
@@ -154,6 +146,166 @@ def login():
         return json_response({"message": "로그인 성공"}, 200)
     
     except Exception as e:
+        return json_response({"error": str(e)}, 500)
+    
+    finally:
+        session.close()
+
+# ------------------------------
+# 즐겨찾기 조회 API (/favorites)
+# ------------------------------
+@app.route("/favorites", methods=["GET"])
+def get_favorites():
+    """
+    프론트엔드는 쿼리 파라미터로 user_name을 전송합니다.
+    
+    요청 예시:
+      GET /favorites?user_name=john_doe_new
+    
+    반환 예시:
+    [
+      {
+        "company_name": "Apple Inc.",
+        "subscriptoin": true,
+        "notification": false
+      },
+      {
+        "company_name": "Tesla Inc.",
+        "subscriptoin": true,
+        "notification": true
+      }
+    ]
+    """
+    user_name = request.args.get("user_name")
+    if not user_name:
+        return json_response({"error": "user_name 파라미터가 필요합니다."}, 400)
+    
+    session = SessionLocal()
+    try:
+        # user_name으로 사용자 조회
+        user = session.query(User).filter_by(user_name=user_name).first()
+        if not user:
+            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
+        
+        # Favorite 테이블에서 해당 사용자의 즐겨찾기 정보 조회
+        favorites = session.query(Favorite).filter_by(user_id=user.id).all()
+        
+        result = []
+        for fav in favorites:
+            result.append({
+                "company_name": fav.company_name,
+                "subscriptoin": fav.subscriptoin,
+                "notification": fav.notification
+            })
+        
+        return json_response(result)
+    except Exception as e:
+        return json_response({"error": str(e)}, 500)
+    finally:
+        session.close()
+
+# ------------------------------
+# 즐겨찾기 구독 상태 업데이트 API (/update_subscription)
+# ------------------------------
+@app.route("/update_subscription", methods=["POST"])
+def update_subscription():
+    """
+    원본 데이터 예시 (JSON):
+    {
+      "user_name": "john_doe",
+      "company_name": "Apple Inc.",
+      "subscriptoin": true
+    }
+    
+    해당 사용자의 Favorite 레코드에서 subscriptoin 값을 업데이트합니다.
+    """
+    data = request.get_json()
+    if not data:
+        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+    
+    user_name = data.get("user_name")
+    company_name = data.get("company_name")
+    new_subscription = data.get("subscriptoin")
+    
+    if user_name is None or company_name is None or new_subscription is None:
+        return json_response(
+            {"error": "user_name, company_name, 및 subscriptoin 필드가 필요합니다."},
+            400
+        )
+    
+    session = SessionLocal()
+    try:
+        # user_name에 해당하는 User 조회
+        user = session.query(User).filter_by(user_name=user_name).first()
+        if not user:
+            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
+        
+        # 해당 사용자의 특정 회사의 Favorite 레코드 조회
+        fav = session.query(Favorite).filter_by(user_id=user.id, company_name=company_name).first()
+        if not fav:
+            return json_response({"error": f"회사 {company_name}에 대한 즐겨찾기 기록이 없습니다."}, 404)
+        
+        # subscriptoin 필드 업데이트
+        fav.subscriptoin = bool(new_subscription)
+        session.commit()
+        return json_response({"message": "구독 상태가 업데이트되었습니다."}, 200)
+    
+    except Exception as e:
+        session.rollback()
+        return json_response({"error": str(e)}, 500)
+    
+    finally:
+        session.close()
+
+
+# ------------------------------
+# 알림 설정 업데이트 API (/update_notification)
+# ------------------------------
+@app.route("/update_notification", methods=["POST"])
+def update_notification():
+    """
+    원본 데이터 예시 (JSON):
+    {
+      "user_name": "john_doe",
+      "company_name": "Apple Inc.",
+      "notification": false
+    }
+    
+    해당 사용자의 Favorite 레코드에서 notification 값을 업데이트합니다.
+    """
+    data = request.get_json()
+    if not data:
+        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+    
+    user_name = data.get("user_name")
+    company_name = data.get("company_name")
+    new_notification = data.get("notification")
+    
+    if user_name is None or company_name is None or new_notification is None:
+        return json_response(
+            {"error": "user_name, company_name, 및 notification 필드가 필요합니다."},
+            400
+        )
+    
+    session = SessionLocal()
+    try:
+        # user_name으로 사용자 조회
+        user = session.query(User).filter_by(user_name=user_name).first()
+        if not user:
+            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
+        
+        # Favorite 레코드 조회 (user_id와 company_name으로)
+        fav = session.query(Favorite).filter_by(user_id=user.id, company_name=company_name).first()
+        if not fav:
+            return json_response({"error": f"회사 {company_name}에 대한 즐겨찾기 기록이 없습니다."}, 404)
+        
+        # notification 필드 업데이트
+        fav.notification = bool(new_notification)
+        session.commit()
+        return json_response({"message": "알림 설정이 업데이트되었습니다."}, 200)
+    
+    except Exception as e:
+        session.rollback()
         return json_response({"error": str(e)}, 500)
     
     finally:
