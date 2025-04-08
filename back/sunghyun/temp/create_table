@@ -1,8 +1,8 @@
-from sqlalchemy import Column, String, Date, DateTime, ForeignKey, create_engine
+from sqlalchemy import Column, String, Date, Boolean, ForeignKey, create_engine
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
-# DB 연결 설정 (Kakao MySQL, DB 이름: capston)
+# ✅ DB 연결 설정 (MySQL, DB 이름: capston)
 DATABASE_URL = (
     "mysql+pymysql://admin:admin1234@"
     "az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5."
@@ -11,51 +11,46 @@ DATABASE_URL = (
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-# 1. 실시간 거래량 상위 10개 주식을 보여주는 테이블
-class TopVolumeStock(Base):
-    __tablename__ = "top_volume_stock"
+# 1. 거래량 상위 10개 주식을 보여주는 테이블
+class TopStock(Base):
+    __tablename__ = "top_stock"
     
-    ticker = Column(String(20), primary_key=True)       # 주식 코드 (기본키)
-    name = Column(String(255), nullable=False)            # 기업 이름
-    price = Column(String(20), nullable=False)            # 현재가 (문자열)
-    volume = Column(String(50), nullable=False)           # 거래량
-    date = Column(Date, nullable=False)                   # 크롤링한 날짜
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # 업데이트 시각
+    company_name = Column(String(255), primary_key=True)   # 기업명 (PK)
+    price = Column(String(20), nullable=False)             # 현재가
+    volume = Column(String(50), nullable=False)            # 거래량
+    ticker = Column(String(20), nullable=False)            # 티커
+    date = Column(Date, nullable=False)                    # 크롤링한 날짜
+    
+    # favorite와의 관계 (참조 값으로 company_name이 사용됨)
+    favorites = relationship("Favorite", back_populates="top_stock", cascade="all, delete-orphan")
 
-# 2. 주식 정보 테이블 (즐겨찾기용, 전체 주식 정보)
-class Stock(Base):
-    __tablename__ = "stock"
-    
-    ticker = Column(String(20), primary_key=True)       # 주식 코드 (기본키)
-    name = Column(String(255), nullable=False)           # 기업 이름
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # 즐겨찾기 관계 (Favorite 테이블과 다대다 관계)
-    favorites = relationship("Favorite", back_populates="stock", cascade="all, delete-orphan")
 
-# 3. 사용자 테이블 (로그인/회원가입)
+# 2. 사용자 테이블
 class User(Base):
     __tablename__ = "user"
     
-    username = Column(String(50), primary_key=True)     # 사용자 이름 (기본키)
-    email = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    user_name = Column(String(50), primary_key=True)         # 사용자 이름 (PK)
+    user_passworkd = Column(String(255), nullable=False)      # 비밀번호
+    user_email = Column(String(100), unique=True, nullable=False)  # 이메일
     
-    # 즐겨찾기 관계
+    # favorite와의 관계 (참조 값으로 user_name이 사용됨)
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
 
-# 4. 즐겨찾기 테이블 (사용자와 주식 간 다대다 관계)
+
+# 3. 사용자가 즐겨찾기한 테이블
 class Favorite(Base):
     __tablename__ = "favorite"
     
-    user_username = Column(String(50), ForeignKey("user.username"), primary_key=True)
-    stock_ticker = Column(String(20), ForeignKey("stock.ticker"), primary_key=True)
-    favorited_at = Column(DateTime, default=datetime.utcnow)  # 즐겨찾기 등록 시각
+    user_name = Column(String(50), ForeignKey("user.user_name"), primary_key=True)
+    company_name = Column(String(255), ForeignKey("top_stock.company_name"), primary_key=True)
+    subscriptoin = Column(Boolean, default=False)   # 즐겨찾기 여부 (기본 false)
+    notification = Column(Boolean, default=False)    # 알림 설정 (기본 false)
     
+    # 관계 설정
     user = relationship("User", back_populates="favorites")
-    stock = relationship("Stock", back_populates="favorites")
+    top_stock = relationship("TopStock", back_populates="favorites")
 
-# 테이블 생성 실행
+
+# ✅ 테이블 생성 실행
 Base.metadata.create_all(bind=engine)
-print("capston 데이터베이스에 모든 테이블이 성공적으로 생성되었습니다.")
+print("✅ capston 데이터베이스에 모든 테이블이 성공적으로 생성되었습니다.")
