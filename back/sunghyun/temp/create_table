@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Date, Boolean, ForeignKey, create_engine
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
-# ✅ DB 연결 설정 (MySQL, DB 이름: capston)
+# DB 연결 설정 (MySQL, DB 이름: capston)
 DATABASE_URL = (
     "mysql+pymysql://admin:admin1234@"
     "az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5."
@@ -11,7 +11,7 @@ DATABASE_URL = (
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-# 1. 거래량 상위 10개 주식을 보여주는 테이블
+# 1. 거래량 상위 10개 주식 테이블
 class TopStock(Base):
     __tablename__ = "top_stock"
     
@@ -21,7 +21,7 @@ class TopStock(Base):
     ticker = Column(String(20), nullable=False)            # 티커
     date = Column(Date, nullable=False)                    # 크롤링한 날짜
     
-    # favorite와의 관계 (참조 값으로 company_name이 사용됨)
+    # Favorite 테이블과의 관계 (company_name을 기준으로 참조)
     favorites = relationship("Favorite", back_populates="top_stock", cascade="all, delete-orphan")
 
 
@@ -33,7 +33,7 @@ class User(Base):
     user_passworkd = Column(String(255), nullable=False)      # 비밀번호
     user_email = Column(String(100), unique=True, nullable=False)  # 이메일
     
-    # favorite와의 관계 (참조 값으로 user_name이 사용됨)
+    # Favorite 테이블과의 관계 (user_name을 기준으로 참조)
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -51,6 +51,6 @@ class Favorite(Base):
     top_stock = relationship("TopStock", back_populates="favorites")
 
 
-# ✅ 테이블 생성 실행
+# 테이블 생성 실행
 Base.metadata.create_all(bind=engine)
-print("✅ capston 데이터베이스에 모든 테이블이 성공적으로 생성되었습니다.")
+print("capston 데이터베이스에 모든 테이블이 성공적으로 생성되었습니다.")
