@@ -7,11 +7,11 @@ from database import Base
 class TopStock(Base):
     __tablename__ = "top_stock"
     
-    company_name = Column(String(255), primary_key=True)   # 기업명 (PK)
-    price = Column(String(20), nullable=False)             # 현재가
-    volume = Column(String(50), nullable=False)            # 거래량
-    ticker = Column(String(20), nullable=False)            # 티커
-    date = Column(Date, nullable=False)                    # 크롤링 날짜
+    company_name = Column(String(255), primary_key=True)
+    price = Column(String(20), nullable=False)
+    volume = Column(String(50), nullable=False)
+    ticker = Column(String(20), nullable=False)
+    date = Column(Date, nullable=False)
 
     favorites = relationship(
         "Favorite",
@@ -24,7 +24,7 @@ class TopStock(Base):
 class User(Base):
     __tablename__ = "user"
     
-    id = Column(String(50), primary_key=True)
+    user_id = Column(String(50), primary_key=True)
     user_name = Column(String(50), nullable=False)
     user_password = Column(String(255), nullable=False)
     user_email = Column(String(100), unique=True, nullable=False)
@@ -37,7 +37,7 @@ class User(Base):
 class Favorite(Base):
     __tablename__ = "favorite"
     
-    user_id = Column(String(50), ForeignKey("user.id"), primary_key=True)
+    user_id = Column(String(50), ForeignKey("user.user_id"), primary_key=True)
     company_name = Column(String(255), primary_key=True)
     subscriptoin = Column(Boolean, default=False)
     notification = Column(Boolean, default=False)
