@@ -1,18 +1,16 @@
-# register_login_favorites.py
 import json
 from flask import Flask, request, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, date
 from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from database import Base   # 미리 정의된 Base
-from models import User, Favorite  # User, Favorite 모델 (Favorite는 TopStock과의 관계를 통해 company_name 필드를 갖습니다.)
+from database import Base
+from models import User, Favorite
 
 app = Flask(__name__)
 
-# DB 연결 설정 (예: DB 이름 capston)
+# DB 연결 설정
 DATABASE_URL = (
     "mysql+pymysql://admin:admin1234@"
     "az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5."
@@ -21,11 +19,11 @@ DATABASE_URL = (
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# 암호화 키 및 객체 (프론트엔드와 공유하는 키)
+# 암호화 키 및 객체
 ENCRYPTION_KEY = b'q5kq0nckcmfJsXvCx-P-nU3IOcT_odDndllXhcnyrY8='
 fernet = Fernet(ENCRYPTION_KEY)
 
-# JSON 응답 처리 함수 (한글 깨짐 방지)
+# JSON 응답 처리 함수
 def json_response(data, status=200):
     return Response(
         response=json.dumps(data, ensure_ascii=False),
@@ -38,25 +36,10 @@ def json_response(data, status=200):
 # ------------------------------
 @app.route("/register", methods=["POST"])
 def register():
-    """
-    클라이언트는 암호화된 JSON 데이터를 전송합니다.
-    
-    원본 데이터 예시 (암호화 대상):
-    {
-      "user_name": "john_doe_new",
-      "user_email": "john_new@example.com",
-      "user_password": "mypassword"
-    }
-    
-    전송 데이터 예시:
-    {
-      "encrypted_data": "<암호화된 문자열>"
-    }
-    """
     data = request.get_json()
     if not data or "encrypted_data" not in data:
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
-    
+
     try:
         encrypted_text = data["encrypted_data"]
         decrypted_bytes = fernet.decrypt(encrypted_text.encode())
@@ -64,37 +47,35 @@ def register():
         payload = json.loads(decrypted_str)
     except Exception as e:
         return json_response({"error": "복호화 실패: " + str(e)}, 400)
-    
+
+    user_id = payload.get("user_id")
     user_name = payload.get("user_name")
     user_email = payload.get("user_email")
     user_password = payload.get("user_password")
-    
-    if not user_name or not user_email or not user_password:
-        return json_response({"error": "user_name, user_email, user_password 필수 입력"}, 400)
-    
-    # 비밀번호 해싱
+
+    if not user_id or not user_name or not user_email or not user_password:
+        return json_response({"error": "user_id, user_name, user_email, user_password 필수 입력"}, 400)
+
     password_hash = generate_password_hash(user_password)
-    
     session = SessionLocal()
+
     try:
-        # user_name 중복 체크
-        existing_user = session.query(User).filter_by(user_name=user_name).first()
-        if existing_user:
-            return json_response({"error": "이미 사용 중인 user_name입니다."}, 400)
-        
+        if session.query(User).filter_by(id=user_id).first():
+            return json_response({"error": "이미 사용 중인 user_id입니다."}, 400)
+
         new_user = User(
+            id=user_id,
             user_name=user_name,
             user_email=user_email,
-            user_passworkd=password_hash  # 모델의 필드명이 user_passworkd임에 주의
+            user_password=password_hash
         )
         session.add(new_user)
         session.commit()
         return json_response({"message": "회원가입 성공"}, 200)
-    
+
     except Exception as e:
         session.rollback()
         return json_response({"error": str(e)}, 500)
-    
     finally:
         session.close()
 
@@ -103,24 +84,10 @@ def register():
 # ------------------------------
 @app.route("/login", methods=["POST"])
 def login():
-    """
-    클라이언트는 암호화된 JSON 데이터를 전송합니다.
-    
-    원본 데이터 예시 (암호화 대상):
-    {
-      "user_name": "john_doe_new",
-      "user_password": "mypassword"
-    }
-    
-    전송 데이터 예시:
-    {
-      "encrypted_data": "<암호화된 문자열>"
-    }
-    """
     data = request.get_json()
     if not data or "encrypted_data" not in data:
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
-    
+
     try:
         encrypted_text = data["encrypted_data"]
         decrypted_bytes = fernet.decrypt(encrypted_text.encode())
@@ -128,27 +95,25 @@ def login():
         payload = json.loads(decrypted_str)
     except Exception as e:
         return json_response({"error": "복호화 실패: " + str(e)}, 400)
-    
-    user_name = payload.get("user_name")
+
+    user_id = payload.get("user_id")
     user_password = payload.get("user_password")
-    
-    if not user_name or not user_password:
-        return json_response({"error": "user_name과 user_password는 필수 입력입니다."}, 400)
-    
+
+    if not user_id or not user_password:
+        return json_response({"error": "user_id와 user_password는 필수 입력입니다."}, 400)
+
     session = SessionLocal()
     try:
-        user = session.query(User).filter_by(user_name=user_name).first()
+        user = session.query(User).filter_by(id=user_id).first()
         if not user:
             return json_response({"error": "사용자가 존재하지 않습니다."}, 404)
-        
-        if not check_password_hash(user.user_passworkd, user_password):
+
+        if not check_password_hash(user.user_password, user_password):
             return json_response({"error": "비밀번호가 올바르지 않습니다."}, 401)
-        
+
         return json_response({"message": "로그인 성공"}, 200)
-    
     except Exception as e:
         return json_response({"error": str(e)}, 500)
-    
     finally:
         session.close()
 
@@ -157,40 +122,18 @@ def login():
 # ------------------------------
 @app.route("/favorites", methods=["GET"])
 def get_favorites():
-    """
-    프론트엔드는 쿼리 파라미터로 user_name을 전송합니다.
-    
-    요청 예시:
-      GET /favorites?user_name=john_doe_new
-    
-    반환 예시:
-    [
-      {
-        "company_name": "Apple Inc.",
-        "subscriptoin": true,
-        "notification": false
-      },
-      {
-        "company_name": "Tesla Inc.",
-        "subscriptoin": true,
-        "notification": true
-      }
-    ]
-    """
-    user_name = request.args.get("user_name")
-    if not user_name:
-        return json_response({"error": "user_name 파라미터가 필요합니다."}, 400)
-    
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return json_response({"error": "user_id 파라미터가 필요합니다."}, 400)
+
     session = SessionLocal()
     try:
-        # user_name으로 사용자 조회
-        user = session.query(User).filter_by(user_name=user_name).first()
+        user = session.query(User).filter_by(id=user_id).first()
         if not user:
-            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
-        
-        # Favorite 테이블에서 해당 사용자의 즐겨찾기 정보 조회
+            return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
+
         favorites = session.query(Favorite).filter_by(user_id=user.id).all()
-        
+
         result = []
         for fav in favorites:
             result.append({
@@ -198,7 +141,7 @@ def get_favorites():
                 "subscriptoin": fav.subscriptoin,
                 "notification": fav.notification
             })
-        
+
         return json_response(result)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
@@ -210,107 +153,99 @@ def get_favorites():
 # ------------------------------
 @app.route("/update_subscription", methods=["POST"])
 def update_subscription():
-    """
-    원본 데이터 예시 (JSON):
-    {
-      "user_name": "john_doe",
-      "company_name": "Apple Inc.",
-      "subscriptoin": true
-    }
-    
-    해당 사용자의 Favorite 레코드에서 subscriptoin 값을 업데이트합니다.
-    """
     data = request.get_json()
     if not data:
         return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
-    
-    user_name = data.get("user_name")
+
+    user_id = data.get("user_id")
     company_name = data.get("company_name")
     new_subscription = data.get("subscriptoin")
-    
-    if user_name is None or company_name is None or new_subscription is None:
+
+    if user_id is None or company_name is None or new_subscription is None:
         return json_response(
-            {"error": "user_name, company_name, 및 subscriptoin 필드가 필요합니다."},
+            {"error": "user_id, company_name, 및 subscriptoin 필드가 필요합니다."},
             400
         )
-    
+
     session = SessionLocal()
     try:
-        # user_name에 해당하는 User 조회
-        user = session.query(User).filter_by(user_name=user_name).first()
+        user = session.query(User).filter_by(id=user_id).first()
         if not user:
-            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
-        
-        # 해당 사용자의 특정 회사의 Favorite 레코드 조회
+            return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
+
         fav = session.query(Favorite).filter_by(user_id=user.id, company_name=company_name).first()
-        if not fav:
-            return json_response({"error": f"회사 {company_name}에 대한 즐겨찾기 기록이 없습니다."}, 404)
-        
-        # subscriptoin 필드 업데이트
-        fav.subscriptoin = bool(new_subscription)
+
+        if fav:
+            fav.subscriptoin = bool(new_subscription)
+        else:
+            # 새로운 즐겨찾기 생성
+            fav = Favorite(
+                user_id=user.id,
+                company_name=company_name,
+                subscriptoin=bool(new_subscription),
+                notification=False
+            )
+            session.add(fav)
+
         session.commit()
         return json_response({"message": "구독 상태가 업데이트되었습니다."}, 200)
-    
+
     except Exception as e:
         session.rollback()
         return json_response({"error": str(e)}, 500)
-    
     finally:
         session.close()
-
 
 # ------------------------------
 # 알림 설정 업데이트 API (/update_notification)
 # ------------------------------
 @app.route("/update_notification", methods=["POST"])
 def update_notification():
-    """
-    원본 데이터 예시 (JSON):
-    {
-      "user_name": "john_doe",
-      "company_name": "Apple Inc.",
-      "notification": false
-    }
-    
-    해당 사용자의 Favorite 레코드에서 notification 값을 업데이트합니다.
-    """
     data = request.get_json()
     if not data:
         return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
-    
-    user_name = data.get("user_name")
+
+    user_id = data.get("user_id")
     company_name = data.get("company_name")
     new_notification = data.get("notification")
-    
-    if user_name is None or company_name is None or new_notification is None:
+
+    if user_id is None or company_name is None or new_notification is None:
         return json_response(
-            {"error": "user_name, company_name, 및 notification 필드가 필요합니다."},
+            {"error": "user_id, company_name, 및 notification 필드가 필요합니다."},
             400
         )
-    
+
     session = SessionLocal()
     try:
-        # user_name으로 사용자 조회
-        user = session.query(User).filter_by(user_name=user_name).first()
+        user = session.query(User).filter_by(id=user_id).first()
         if not user:
-            return json_response({"error": f"사용자 {user_name}을(를) 찾을 수 없습니다."}, 404)
-        
-        # Favorite 레코드 조회 (user_id와 company_name으로)
+            return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
+
+        # 즐겨찾기 찾기 or 생성
         fav = session.query(Favorite).filter_by(user_id=user.id, company_name=company_name).first()
-        if not fav:
-            return json_response({"error": f"회사 {company_name}에 대한 즐겨찾기 기록이 없습니다."}, 404)
-        
-        # notification 필드 업데이트
-        fav.notification = bool(new_notification)
+
+        if fav:
+            fav.notification = bool(new_notification)
+        else:
+            # 새로운 즐겨찾기 생성하면서 알림 설정도 함께
+            fav = Favorite(
+                user_id=user.id,
+                company_name=company_name,
+                subscriptoin=False,  # 기본값
+                notification=bool(new_notification)
+            )
+            session.add(fav)
+
         session.commit()
         return json_response({"message": "알림 설정이 업데이트되었습니다."}, 200)
-    
+
     except Exception as e:
         session.rollback()
         return json_response({"error": str(e)}, 500)
-    
     finally:
         session.close()
-
+# ------------------------------
+# 앱 실행
+# ------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
