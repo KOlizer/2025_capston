@@ -8,10 +8,10 @@ fernet = Fernet(ENCRYPTION_KEY)
 
 # 회원가입용 또는 로그인용 데이터 입력
 data = {
-    "user_id": "user003",
-    "user_name": "홍길동",
-    "user_email": "hong@example.com",
-    "user_password": "test1234"
+    "user_id": "postman01",
+    "user_name": "포스트맨유저",
+    "user_email": "postman01@example.com",
+    "user_password": "secure123"
 }
 endpoint = "register"  # "register" 또는 "login"
 
