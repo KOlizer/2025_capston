@@ -1,4 +1,3 @@
-# create_table.py
 from cryptography.fernet import Fernet
 import json
 
