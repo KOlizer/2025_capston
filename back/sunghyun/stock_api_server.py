@@ -4,9 +4,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
+from bs4 import BeautifulSoup
+import requests
+from datetime import datetime
 
 from database import Base
-from models import User, Favorite
+from models import User, Favorite, TopStock
 
 app = Flask(__name__)
 
@@ -18,6 +21,9 @@ DATABASE_URL = (
 )
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
+
+# 테이블 자동 생성 (User, Favorite, TopStock 등)
+Base.metadata.create_all(bind=engine)
 
 # 암호화 키
 ENCRYPTION_KEY = b'q5kq0nckcmfJsXvCx-P-nU3IOcT_odDndllXhcnyrY8='
@@ -31,7 +37,9 @@ def json_response(data, status=200):
         mimetype="application/json"
     )
 
-# 회원가입
+# -----------------------------
+# 기존 회원가입/로그인/즐겨찾기 로직
+# -----------------------------
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -39,8 +47,7 @@ def register():
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
 
     try:
-        encrypted_text = data["encrypted_data"]
-        decrypted_str = fernet.decrypt(encrypted_text.encode()).decode("utf-8")
+        decrypted_str = fernet.decrypt(data["encrypted_data"].encode()).decode("utf-8")
         payload = json.loads(decrypted_str)
     except Exception as e:
         return json_response({"error": "복호화 실패: " + str(e)}, 400)
@@ -55,7 +62,6 @@ def register():
 
     password_hash = generate_password_hash(user_password)
     session = SessionLocal()
-
     try:
         if session.query(User).filter_by(user_id=user_id).first():
             return json_response({"error": "이미 사용 중인 user_id입니다."}, 400)
@@ -75,7 +81,6 @@ def register():
     finally:
         session.close()
 
-# 로그인
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -90,7 +95,6 @@ def login():
 
     user_id = payload.get("user_id")
     user_password = payload.get("user_password")
-
     if not user_id or not user_password:
         return json_response({"error": "user_id와 user_password는 필수 입력입니다."}, 400)
 
@@ -99,17 +103,14 @@ def login():
         user = session.query(User).filter_by(user_id=user_id).first()
         if not user:
             return json_response({"error": "사용자가 존재하지 않습니다."}, 404)
-
         if not check_password_hash(user.user_password, user_password):
             return json_response({"error": "비밀번호가 올바르지 않습니다."}, 401)
-
         return json_response({"message": "로그인 성공"}, 200)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
     finally:
         session.close()
 
-# 즐겨찾기 조회
 @app.route("/favorites", methods=["GET"])
 def get_favorites():
     user_id = request.args.get("user_id")
@@ -121,103 +122,177 @@ def get_favorites():
         user = session.query(User).filter_by(user_id=user_id).first()
         if not user:
             return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
-
         favorites = session.query(Favorite).filter_by(user_id=user.user_id).all()
-
         result = [{
             "company_name": fav.company_name,
             "subscriptoin": fav.subscriptoin,
             "notification": fav.notification
         } for fav in favorites]
-
         return json_response(result)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
     finally:
         session.close()
 
-# 구독 상태 업데이트
-@app.route("/update_subscription", methods=["POST"])
-def update_subscription():
-    data = request.get_json()
-    if not data:
-        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+# -----------------------------------
+# 거래량 상위 10개 주식 스크래핑 + 저장
+# -----------------------------------
+def get_top_10_by_volume():
+    url = "https://finance.yahoo.com/markets/stocks/most-active/"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "html.parser")
+    rows = soup.select("table tbody tr")[:10]
 
-    user_id = data.get("user_id")
-    company_name = data.get("company_name")
-    new_subscription = data.get("subscriptoin")
+    stocks = []
+    for row in rows:
+        cols = row.find_all("td")
+        ticker  = cols[0].get_text(strip=True)
+        company = cols[1].get_text(strip=True)
+        price   = row.find("fin-streamer", {"data-field": "regularMarketPrice"}).get_text(strip=True)
+        volume  = cols[6].get_text(strip=True)
+        stocks.append({
+            "company_name": company,
+            "ticker": ticker,
+            "price": price,
+            "volume": volume
+        })
+    return stocks
 
-    if not user_id or not company_name or new_subscription is None:
-        return json_response({"error": "user_id, company_name, subscriptoin 필드가 필요합니다."}, 400)
-
+def upsert_top_stocks():
+    stocks = get_top_10_by_volume()
+    today = datetime.now().date()
     session = SessionLocal()
     try:
-        user = session.query(User).filter_by(user_id=user_id).first()
-        if not user:
-            return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
-
-        fav = session.query(Favorite).filter_by(user_id=user.user_id, company_name=company_name).first()
-
-        if fav:
-            fav.subscriptoin = bool(new_subscription)
-        else:
-            fav = Favorite(
-                user_id=user.user_id,
-                company_name=company_name,
-                subscriptoin=bool(new_subscription),
-                notification=False
-            )
-            session.add(fav)
-
+        for s in stocks:
+            obj = session.get(TopStock, s["company_name"])
+            if obj:
+                obj.ticker = s["ticker"]
+                obj.price  = s["price"]
+                obj.volume = s["volume"]
+                obj.date   = today
+            else:
+                obj = TopStock(
+                    company_name=s["company_name"],
+                    ticker=s["ticker"],
+                    price=s["price"],
+                    volume=s["volume"],
+                    date=today
+                )
+                session.add(obj)
         session.commit()
-        return json_response({"message": "구독 상태가 업데이트되었습니다."}, 200)
+        for s in stocks:
+            s["date"] = today.isoformat()
+    finally:
+        session.close()
+    return stocks
+
+@app.route("/top_stocks/refresh", methods=["GET"])
+def refresh_top_stocks():
+    try:
+        stocks = upsert_top_stocks()
+        return json_response({"top_stocks": stocks}, 200)
     except Exception as e:
-        session.rollback()
         return json_response({"error": str(e)}, 500)
+
+@app.route("/top_stocks", methods=["GET"])
+def get_top_stocks():
+    session = SessionLocal()
+    try:
+        today = datetime.now().date()
+        rows = session.query(TopStock).filter(TopStock.date == today).all()
+        result = [{
+            "company_name": r.company_name,
+            "ticker":       r.ticker,
+            "price":        r.price,
+            "volume":       r.volume,
+            "date":         r.date.isoformat()
+        } for r in rows]
+        return json_response(result, 200)
     finally:
         session.close()
 
-# 알림 설정 업데이트
-@app.route("/update_notification", methods=["POST"])
-def update_notification():
-    data = request.get_json()
-    if not data:
-        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+# -----------------------------------
+# 특정 주식 상세 조회 (BeautifulSoup만 사용)
+# -----------------------------------
+def get_stock_info(ticker):
+    url = f"https://finance.yahoo.com/quote/{ticker}?p={ticker}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "html.parser")
 
-    user_id = data.get("user_id")
-    company_name = data.get("company_name")
-    new_notification = data.get("notification")
+    # 요약 테이블에서 모든 항목 읽어 dict에 저장
+    summary = {}
+    for tr in soup.select('#quote-summary table tr'):
+        tds = tr.find_all('td')
+        if len(tds) == 2:
+            label = tds[0].get_text(strip=True)
+            val   = tds[1].get_text(strip=True)
+            summary[label] = val
 
-    if not user_id or not company_name or new_notification is None:
-        return json_response({"error": "user_id, company_name, notification 필드가 필요합니다."}, 400)
+    # helper 함수
+    def to_float(s):
+        try:
+            return float(s.replace(',', ''))
+        except:
+            return None
 
-    session = SessionLocal()
+    def to_number(s):
+        if not s:
+            return None
+        s = s.replace(',', '')
+        mult = 1
+        if s.endswith('M'):
+            mult = 1e6
+            s = s[:-1]
+        if s.endswith('B'):
+            mult = 1e9
+            s = s[:-1]
+        try:
+            return float(s) * mult
+        except:
+            return None
+
+    # 현재가 파싱
+    elem = soup.find('fin-streamer', {'data-field': 'regularMarketPrice'})
+    price = to_float(elem.get_text()) if elem else None
+
+    prev_close = to_float(summary.get('Previous Close'))
+    daily_change = round(price - prev_close, 2) if price is not None and prev_close is not None else None
+    volume = to_number(summary.get('Volume'))
+    avg_volume = to_number(summary.get('Avg. Volume'))
+    pe_trailing = to_float(summary.get('PE Ratio (TTM)'))
+    pe_forward  = to_float(summary.get('Forward P/E'))
+    eps         = to_float(summary.get('EPS (TTM)'))
+    dollar_amount = round(price * volume, 2) if price is not None and volume is not None else None
+
+    # 회사명
+    h1 = soup.find('h1')
+    company_name = h1.get_text(strip=True).rsplit(' (', 1)[0] if h1 else ticker
+
+    return {
+        'company_name': company_name,
+        'ticker': ticker,
+        'price': price,
+        'volume': volume,
+        'avg_volume': avg_volume,
+        'PER_trailing': pe_trailing,
+        'PER_forward': pe_forward,
+        'EPS': eps,
+        'daily_change': daily_change,
+        'dollar_amount': dollar_amount
+    }
+
+@app.route('/stock/<ticker>', methods=['GET'])
+def stock_detail(ticker):
     try:
-        user = session.query(User).filter_by(user_id=user_id).first()
-        if not user:
-            return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
-
-        fav = session.query(Favorite).filter_by(user_id=user.user_id, company_name=company_name).first()
-
-        if fav:
-            fav.notification = bool(new_notification)
-        else:
-            fav = Favorite(
-                user_id=user.user_id,
-                company_name=company_name,
-                subscriptoin=False,
-                notification=bool(new_notification)
-            )
-            session.add(fav)
-
-        session.commit()
-        return json_response({"message": "알림 설정이 업데이트되었습니다."}, 200)
+        info = get_stock_info(ticker)
+        return json_response({'stock': info}, 200)
     except Exception as e:
-        session.rollback()
-        return json_response({"error": str(e)}, 500)
-    finally:
-        session.close()
+        return json_response({'error': str(e)}, 500)
 
 # 앱 실행
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
