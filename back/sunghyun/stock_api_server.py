@@ -1,4 +1,5 @@
 import json
+import re
 from flask import Flask, request, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -6,7 +7,10 @@ from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
 from bs4 import BeautifulSoup
 import requests
+from googletrans import Translator
 from datetime import datetime
+import yfinance as yf
+
 
 from database import Base
 from models import User, Favorite, TopStock
@@ -21,15 +25,12 @@ DATABASE_URL = (
 )
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
-
-# 테이블 자동 생성 (User, Favorite, TopStock 등)
 Base.metadata.create_all(bind=engine)
 
 # 암호화 키
 ENCRYPTION_KEY = b'q5kq0nckcmfJsXvCx-P-nU3IOcT_odDndllXhcnyrY8='
 fernet = Fernet(ENCRYPTION_KEY)
 
-# 응답 함수
 def json_response(data, status=200):
     return Response(
         response=json.dumps(data, ensure_ascii=False),
@@ -45,7 +46,6 @@ def register():
     data = request.get_json()
     if not data or "encrypted_data" not in data:
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
-
     try:
         decrypted_str = fernet.decrypt(data["encrypted_data"].encode()).decode("utf-8")
         payload = json.loads(decrypted_str)
@@ -56,7 +56,6 @@ def register():
     user_name = payload.get("user_name")
     user_email = payload.get("user_email")
     user_password = payload.get("user_password")
-
     if not user_id or not user_name or not user_email or not user_password:
         return json_response({"error": "user_id, user_name, user_email, user_password 필수 입력"}, 400)
 
@@ -65,7 +64,6 @@ def register():
     try:
         if session.query(User).filter_by(user_id=user_id).first():
             return json_response({"error": "이미 사용 중인 user_id입니다."}, 400)
-
         new_user = User(
             user_id=user_id,
             user_name=user_name,
@@ -86,7 +84,6 @@ def login():
     data = request.get_json()
     if not data or "encrypted_data" not in data:
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
-
     try:
         decrypted_str = fernet.decrypt(data["encrypted_data"].encode()).decode("utf-8")
         payload = json.loads(decrypted_str)
@@ -116,7 +113,6 @@ def get_favorites():
     user_id = request.args.get("user_id")
     if not user_id:
         return json_response({"error": "user_id 파라미터가 필요합니다."}, 400)
-
     session = SessionLocal()
     try:
         user = session.query(User).filter_by(user_id=user_id).first()
@@ -188,111 +184,89 @@ def upsert_top_stocks():
         session.close()
     return stocks
 
-@app.route("/top_stocks/refresh", methods=["GET"])
-def refresh_top_stocks():
+
+@app.route("/top_stocks", methods=["GET"])
+def top_stocks():
+    """
+    호출할 때마다 최신 거래량 상위 10개 데이터를 크롤링/DB에 upsert 후 반환합니다.
+    """
     try:
+        # 1) 스크래핑 + DB 갱신
         stocks = upsert_top_stocks()
+        # 2) 결과 반환
         return json_response({"top_stocks": stocks}, 200)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
 
-@app.route("/top_stocks", methods=["GET"])
-def get_top_stocks():
-    session = SessionLocal()
-    try:
-        today = datetime.now().date()
-        rows = session.query(TopStock).filter(TopStock.date == today).all()
-        result = [{
-            "company_name": r.company_name,
-            "ticker":       r.ticker,
-            "price":        r.price,
-            "volume":       r.volume,
-            "date":         r.date.isoformat()
-        } for r in rows]
-        return json_response(result, 200)
-    finally:
-        session.close()
+# ----------------------------
+# 1) 한글 → 영어 번역
+# ----------------------------
+translator = Translator()
+def translate_company_name(name_ko: str) -> str:
+    result = translator.translate(name_ko, src='ko', dest='en')
+    return result.text
 
-# -----------------------------------
-# 특정 주식 상세 조회 (BeautifulSoup만 사용)
-# -----------------------------------
-def get_stock_info(ticker):
-    url = f"https://finance.yahoo.com/quote/{ticker}?p={ticker}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(url, headers=headers)
+# ----------------------------
+# 2) 회사명 검색 → 티커 반환
+# ----------------------------
+def search_ticker(company_name_ko: str) -> (str, str):
+    name_en = translate_company_name(company_name_ko)
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+    resp = requests.get(url,
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        params={"q": name_en, "lang": "en-US"})
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
+    quotes = resp.json().get("quotes", [])
+    if not quotes:
+        raise ValueError(f"'{company_name_ko}' 검색 결과가 없습니다.")
+    first = quotes[0]
+    symbol    = first.get("symbol")
+    shortname = first.get("shortname") or first.get("longname") or company_name_ko
+    return symbol, shortname
 
-    # 요약 테이블에서 모든 항목 읽어 dict에 저장
-    summary = {}
-    for tr in soup.select('#quote-summary table tr'):
-        tds = tr.find_all('td')
-        if len(tds) == 2:
-            label = tds[0].get_text(strip=True)
-            val   = tds[1].get_text(strip=True)
-            summary[label] = val
-
-    # helper 함수
-    def to_float(s):
-        try:
-            return float(s.replace(',', ''))
-        except:
-            return None
-
-    def to_number(s):
-        if not s:
-            return None
-        s = s.replace(',', '')
-        mult = 1
-        if s.endswith('M'):
-            mult = 1e6
-            s = s[:-1]
-        if s.endswith('B'):
-            mult = 1e9
-            s = s[:-1]
-        try:
-            return float(s) * mult
-        except:
-            return None
-
-    # 현재가 파싱
-    elem = soup.find('fin-streamer', {'data-field': 'regularMarketPrice'})
-    price = to_float(elem.get_text()) if elem else None
-
-    prev_close = to_float(summary.get('Previous Close'))
-    daily_change = round(price - prev_close, 2) if price is not None and prev_close is not None else None
-    volume = to_number(summary.get('Volume'))
-    avg_volume = to_number(summary.get('Avg. Volume'))
-    pe_trailing = to_float(summary.get('PE Ratio (TTM)'))
-    pe_forward  = to_float(summary.get('Forward P/E'))
-    eps         = to_float(summary.get('EPS (TTM)'))
-    dollar_amount = round(price * volume, 2) if price is not None and volume is not None else None
-
-    # 회사명
-    h1 = soup.find('h1')
-    company_name = h1.get_text(strip=True).rsplit(' (', 1)[0] if h1 else ticker
+# ----------------------------
+# 3) get_stock_info: crumb+JSON API 호출
+# ----------------------------
+def get_stock_info(ticker: str) -> dict:
+    stock = yf.Ticker(ticker)
+    info  = stock.info
 
     return {
-        'company_name': company_name,
-        'ticker': ticker,
-        'price': price,
-        'volume': volume,
-        'avg_volume': avg_volume,
-        'PER_trailing': pe_trailing,
-        'PER_forward': pe_forward,
-        'EPS': eps,
-        'daily_change': daily_change,
-        'dollar_amount': dollar_amount
+        "현재 주가":        info.get("regularMarketPrice"),
+        "시가총액":         info.get("marketCap"),
+        "PER (Trailing)":  info.get("trailingPE"),
+        "PER (Forward)":   info.get("forwardPE"),
+        "전일 종가":        info.get("previousClose"),
+        "시가":            info.get("open"),
+        "고가":            info.get("dayHigh"),
+        "저가":            info.get("dayLow"),
+        "52주 최고":       info.get("fiftyTwoWeekHigh"),
+        "52주 최저":       info.get("fiftyTwoWeekLow"),
+        "거래량":          info.get("volume"),
+        "평균 거래량":     info.get("averageVolume"),
+        "배당 수익률":     info.get("dividendYield"),
     }
 
-@app.route('/stock/<ticker>', methods=['GET'])
-def stock_detail(ticker):
+# ----------------------------
+# 4) /stocks/search 엔드포인트
+# ----------------------------
+@app.route('/stocks/search', methods=['GET'])
+def stock_search():
+    name_ko = request.args.get('name')
+    if not name_ko:
+        return json_response({"error": "name 파라미터가 필요합니다."}, 400)
     try:
+        ticker, _ = search_ticker(name_ko)
         info = get_stock_info(ticker)
-        return json_response({'stock': info}, 200)
+        return json_response({
+            "company_name": name_ko,
+            "ticker":       ticker,
+            "info":         info
+        }, 200)
+    except ValueError as ve:
+        return json_response({"error": str(ve)}, 404)
     except Exception as e:
-        return json_response({'error': str(e)}, 500)
+        return json_response({"error": str(e)}, 500)
 
-# 앱 실행
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
