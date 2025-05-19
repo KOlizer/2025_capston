@@ -8,8 +8,9 @@
 
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Fernet.js (cryptography.fernet 호환) -->
+  <!-- Fernet.js (Python cryptography.fernet 호환) -->
   <script src="https://cdn.jsdelivr.net/npm/fernet@0.8.0/fernet.min.js"></script>
+  <!-- (CryptoJS는 더 이상 사용하지 않습니다) -->
 </head>
 <body>
   <header>
@@ -34,7 +35,7 @@
     </form>
   </main>
 
-  <!-- login.js 는 defer로 로드 -->
+  <!-- login.js 는 defer 옵션으로 로드 -->
   <script src="/static/js/login.js" defer></script>
 </body>
 </html>
