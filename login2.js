@@ -83,4 +83,30 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     // ─────────── 로그인 API 호출 ────────────
     const response = await fetch('http://61.109.236.163:8000/login', {
-      method:
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ encrypted_data: fernetToken })
+    });
+    const result = await response.json();
+    console.log('👀 /login response:', response.status, result);
+
+    if (!response.ok) {
+      throw new Error(result.error || JSON.stringify(result));
+    }
+
+    await Swal.fire({
+      icon: 'success',
+      title: '로그인 성공',
+      text: '환영합니다!'
+    });
+    window.location.href = '../templates/index.html';
+
+  } catch (err) {
+    console.error('로그인 중 오류:', err);
+    Swal.fire({
+      icon: 'error',
+      title: '오류',
+      text: err.message || '로그인에 실패했습니다.'
+    });
+  }
+});
