@@ -1,5 +1,4 @@
 import json
-import re
 import logging
 from flask import Flask, request, Response
 from flask_cors import CORS
@@ -46,6 +45,14 @@ def json_response(data, status=200):
         mimetype="application/json"
     )
 
+# 헬퍼: URL-safe Base64 토큰 정규화
+def normalize_token(raw_token: str) -> str:
+    token = raw_token.replace('-', '+').replace('_', '/')
+    pad = len(token) % 4
+    if pad:
+        token += '=' * (4 - pad)
+    return token
+
 # -----------------------------
 # 회원가입 엔드포인트
 # -----------------------------
@@ -58,26 +65,20 @@ def register():
 
     raw_token = data["encrypted_data"]
     app.logger.debug("Received token: %s", raw_token)
-    # URL-safe -> 표준 Base64
-    token = raw_token.replace('-', '+').replace('_', '/')
-    # 패딩
-    pad = len(token) % 4
-    if pad:
-        token += '=' * (4 - pad)
+    token = normalize_token(raw_token)
     app.logger.debug("Normalized token: %s", token)
 
     try:
         decrypted_str = fernet.decrypt(token.encode()).decode('utf-8')
         app.logger.debug("Decrypted payload: %s", decrypted_str)
         payload = json.loads(decrypted_str)
-    except InvalidToken as e:
+    except InvalidToken:
         app.logger.exception("InvalidToken during decryption")
-        return json_response({"error": f"복호화 실패: InvalidToken"}, 400)
+        return json_response({"error": "복호화 실패: InvalidToken"}, 400)
     except Exception as e:
         app.logger.exception("Error during decryption")
-        return json_response({"error": f"복호화 실패: {type(e).__name__} {str(e)}"}, 400)
+        return json_response({"error": f"복호화 실패: {type(e).__name__} {e}"}, 400)
 
-    # 필수 필드
     user_id       = payload.get("user_id")
     user_name     = payload.get("user_name")
     user_email    = payload.get("user_email")
@@ -85,16 +86,16 @@ def register():
     if not all([user_id, user_name, user_email, user_password]):
         return json_response({"error": "user_id, user_name, user_email, user_password 필수 입력"}, 400)
 
-    password_hash = generate_password_hash(user_password)
     session = SessionLocal()
     try:
         if session.query(User).filter_by(user_id=user_id).first():
             return json_response({"error": "이미 사용 중인 user_id입니다."}, 400)
+        hashed = generate_password_hash(user_password)
         new_user = User(
             user_id=user_id,
             user_name=user_name,
             user_email=user_email,
-            user_password=password_hash
+            user_password=hashed
         )
         session.add(new_user)
         session.commit()
@@ -113,27 +114,41 @@ def register():
 def login():
     data = request.get_json()
     if not data or "encrypted_data" not in data:
+        app.logger.debug("Missing encrypted_data in login: %s", data)
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
-    try:
-        decrypted_str = fernet.decrypt(data["encrypted_data"].encode()).decode('utf-8')
-        payload = json.loads(decrypted_str)
-    except Exception as e:
-        return json_response({"error": "복호화 실패: " + str(e)}, 400)
 
-    user_id       = payload.get("user_id")
+    raw_token = data["encrypted_data"]
+    app.logger.debug("Login received token: %s", raw_token)
+    token = normalize_token(raw_token)
+    app.logger.debug("Login normalized token: %s", token)
+
+    try:
+        decrypted_str = fernet.decrypt(token.encode()).decode('utf-8')
+        app.logger.debug("Login decrypted payload: %s", decrypted_str)
+        payload = json.loads(decrypted_str)
+    except InvalidToken:
+        app.logger.exception("InvalidToken during login decryption")
+        return json_response({"error": "복호화 실패: InvalidToken"}, 400)
+    except Exception as e:
+        app.logger.exception("Error during login decryption")
+        return json_response({"error": f"복호화 실패: {type(e).__name__} {e}"}, 400)
+
+    # 이메일 기준으로 로그인
+    user_email    = payload.get("user_email")
     user_password = payload.get("user_password")
-    if not user_id or not user_password:
-        return json_response({"error": "user_id와 user_password는 필수 입력입니다."}, 400)
+    if not user_email or not user_password:
+        return json_response({"error": "user_email와 user_password는 필수 입력입니다."}, 400)
 
     session = SessionLocal()
     try:
-        user = session.query(User).filter_by(user_id=user_id).first()
+        user = session.query(User).filter_by(user_email=user_email).first()
         if not user:
-            return json_response({"error": "사용자가 존재하지 않습니다."}, 404)
+            return json_response({"error": "이메일이 존재하지 않습니다."}, 404)
         if not check_password_hash(user.user_password, user_password):
             return json_response({"error": "비밀번호가 올바르지 않습니다."}, 401)
         return json_response({"message": "로그인 성공"}, 200)
     except Exception as e:
+        app.logger.exception("Error during login DB lookup")
         return json_response({"error": str(e)}, 500)
     finally:
         session.close()
@@ -151,12 +166,11 @@ def get_favorites():
         user = session.query(User).filter_by(user_id=user_id).first()
         if not user:
             return json_response({"error": f"사용자 {user_id}을(를) 찾을 수 없습니다."}, 404)
-        favorites = session.query(Favorite).filter_by(user_id=user.user_id).all()
-        result = [
+        favs = session.query(Favorite).filter_by(user_id=user.user_id).all()
+        return json_response([
             {"company_name": f.company_name, "subscription": f.subscription, "notification": f.notification}
-            for f in favorites
-        ]
-        return json_response(result)
+            for f in favs
+        ], 200)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
     finally:
@@ -166,19 +180,22 @@ def get_favorites():
 # 거래량 상위 10개 주식 스크래핑 + 저장
 # -----------------------------------
 def get_top_10_by_volume():
-    url = "https://finance.yahoo.com/markets/stocks/most-active/"
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    resp = requests.get(
+        "https://finance.yahoo.com/markets/stocks/most-active/",
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
     rows = soup.select("table tbody tr")[:10]
     stocks = []
     for row in rows:
         cols = row.find_all("td")
-        ticker  = cols[0].get_text(strip=True)
-        company = cols[1].get_text(strip=True)
-        price   = row.find("fin-streamer", {"data-field": "regularMarketPrice"}).get_text(strip=True)
-        volume  = cols[6].get_text(strip=True)
-        stocks.append({"company_name": company, "ticker": ticker, "price": price, "volume": volume})
+        stocks.append({
+            "company_name": cols[1].get_text(strip=True),
+            "ticker":       cols[0].get_text(strip=True),
+            "price":        row.find("fin-streamer", {"data-field": "regularMarketPrice"}).get_text(strip=True),
+            "volume":       cols[6].get_text(strip=True)
+        })
     return stocks
 
 def upsert_top_stocks():
@@ -189,13 +206,11 @@ def upsert_top_stocks():
         for s in stocks:
             obj = session.get(TopStock, s["company_name"])
             if obj:
-                obj.ticker = s["ticker"]
-                obj.price  = s["price"]
-                obj.volume = s["volume"]
-                obj.date   = today
+                obj.ticker, obj.price, obj.volume, obj.date = (
+                    s["ticker"], s["price"], s["volume"], today
+                )
             else:
-                obj = TopStock(**{**s, "date": today})
-                session.add(obj)
+                session.add(TopStock(**{**s, "date": today}))
         session.commit()
         for s in stocks:
             s["date"] = today.isoformat()
@@ -206,14 +221,13 @@ def upsert_top_stocks():
 @app.route("/top_stocks", methods=["GET"])
 def top_stocks():
     try:
-        stocks = upsert_top_stocks()
-        return json_response({"top_stocks": stocks}, 200)
+        return json_response({"top_stocks": upsert_top_stocks()}, 200)
     except Exception as e:
         return json_response({"error": str(e)}, 500)
 
-# ----------------------------
+# -----------------------------
 # 주식 검색 및 정보 조회
-# ----------------------------
+# -----------------------------
 translator = Translator()
 def translate_company_name(name_ko: str) -> str:
     return translator.translate(name_ko, src='ko', dest='en').text
@@ -245,19 +259,19 @@ def stock_search():
             "company_name": name_ko,
             "ticker":       ticker,
             "info":         {
-                "현재 주가":      info.get("regularMarketPrice"),
-                "시가총액":       info.get("marketCap"),
-                "PER (Trailing)":info.get("trailingPE"),
-                "PER (Forward)": info.get("forwardPE"),
-                "전일 종가":      info.get("previousClose"),
-                "시가":          info.get("open"),
-                "고가":          info.get("dayHigh"),
-                "저가":          info.get("dayLow"),
-                "52주 최고":     info.get("fiftyTwoWeekHigh"),
-                "52주 최저":     info.get("fiftyTwoWeekLow"),
-                "거래량":        info.get("volume"),
-                "평균 거래량":   info.get("averageVolume"),
-                "배당 수익률":   info.get("dividendYield"),
+                "현재 주가":        info.get("regularMarketPrice"),
+                "시가총액":         info.get("marketCap"),
+                "PER (Trailing)":  info.get("trailingPE"),
+                "PER (Forward)":   info.get("forwardPE"),
+                "전일 종가":        info.get("previousClose"),
+                "시가":            info.get("open"),
+                "고가":            info.get("dayHigh"),
+                "저가":            info.get("dayLow"),
+                "52주 최고":       info.get("fiftyTwoWeekHigh"),
+                "52주 최저":       info.get("fiftyTwoWeekLow"),
+                "거래량":          info.get("volume"),
+                "평균 거래량":     info.get("averageVolume"),
+                "배당 수익률":     info.get("dividendYield"),
             }
         }, 200)
     except ValueError as ve:
