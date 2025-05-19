@@ -34,10 +34,13 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         // URL-safe Base64를 표준 Base64로 변환
         const toStandardBase64 = str => str.replace(/-/g, '+').replace(/_/g, '/');
 
-        // Base64 키 검증
+        // Base64 키 검증 (URL-safe 문자 '-' '_' 포함)
         const isValidBase64 = str => {
-            const pattern = /^[A-Za-z0-9+/=]+$/;
-            if (!pattern.test(str)) return false;
+            const pattern = /^[A-Za-z0-9+/=_-]+$/;
+            if (!pattern.test(str)) {
+                console.error('Base64 패턴 불일치:', str);
+                return false;
+            }
             try {
                 const decoded = atob(toStandardBase64(str));
                 return btoa(decoded) === toStandardBase64(str);
