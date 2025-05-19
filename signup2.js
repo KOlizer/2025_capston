@@ -36,16 +36,11 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
 
         // Base64 키 검증
         const isValidBase64 = str => {
-            const base64Pattern = /^[A-Za-z0-9+/=]+$/;
-            if (!base64Pattern.test(str)) {
-                console.error('Base64 패턴 불일치:', str);
-                return false;
-            }
+            const pattern = /^[A-Za-z0-9+/=]+$/;
+            if (!pattern.test(str)) return false;
             try {
-                const standardStr = toStandardBase64(str);
-                const decoded = atob(standardStr);
-                const reEncoded = btoa(decoded);
-                return reEncoded === standardStr;
+                const decoded = atob(toStandardBase64(str));
+                return btoa(decoded) === toStandardBase64(str);
             } catch {
                 return false;
             }
@@ -59,12 +54,10 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         const encoder = new TextEncoder();
         const data = encoder.encode(JSON.stringify(userData));
 
-        // 키 준비 (Base64 → Uint8Array)
+        // 키 디코딩
         const rawKey = toStandardBase64(ENCRYPTION_KEY);
         const keyData = Uint8Array.from(atob(rawKey), c => c.charCodeAt(0));
-        if (keyData.length !== 32) {
-            throw new Error(`키 길이 오류: ${keyData.length} 바이트`);
-        }
+        if (keyData.length !== 32) throw new Error(`키 길이 오류: ${keyData.length} 바이트`);
 
         // AES-CBC / HMAC 키 분리
         const encryptionKey = keyData.slice(0, 16);
@@ -74,11 +67,11 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         const aesKey  = await crypto.subtle.importKey('raw', encryptionKey, { name: 'AES-CBC' }, false, ['encrypt']);
         const hmacKey = await crypto.subtle.importKey('raw', signingKey,    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 
-        // IV 생성 & AES-CBC 암호화
+        // IV 생성 및 암호화
         const iv = crypto.getRandomValues(new Uint8Array(16));
         const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, aesKey, data);
 
-        // Fernet 토큰 구성: version + timestamp + iv + ciphertext
+        // Fernet 구성 요소
         const version   = new Uint8Array([0x80]);
         const timestamp = new Uint8Array(8);
         let ts = Math.floor(Date.now() / 1000);
@@ -87,7 +80,7 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
             ts >>= 8;
         }
 
-        // HMAC 계산용 바이트 배열
+        // HMAC 대상
         const toSign = new Uint8Array([
             ...version,
             ...timestamp,
@@ -96,7 +89,7 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         ]);
         const signature = await crypto.subtle.sign('HMAC', hmacKey, toSign);
 
-        // **변경된 부분**: raw Base64 → URL-safe Base64
+        // raw Base64 토큰 생성
         const rawToken = btoa(
             String.fromCharCode(
                 ...version,
@@ -106,37 +99,29 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
                 ...new Uint8Array(signature)
             )
         );
-        const fernetToken = rawToken
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_');
+        // URL-safe Base64 변환 (Python Fernet 호환)
+        const fernetToken = rawToken.replace(/\+/g, '-').replace(/\//g, '_');
 
-        console.log('URL-safe Fernet 토큰:', fernetToken);
+        console.log('🔐 Fernet Token (URL-safe):', fernetToken);
 
-        // 백엔드 API 호출
+        // 회원가입 요청
         const response = await fetch('http://61.109.236.163:8000/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ encrypted_data: fernetToken })
         });
         const result = await response.json();
+        console.log('👀 서버 응답:', response.status, result);
 
         if (!response.ok) {
-            throw new Error(result.error || '회원가입에 실패했습니다.');
+            throw new Error(result.error || JSON.stringify(result));
         }
 
-        await Swal.fire({
-            icon: 'success',
-            title: '회원가입 완료',
-            text: '가입이 완료되었습니다.'
-        });
+        await Swal.fire({ icon: 'success', title: '회원가입 완료', text: '가입이 완료되었습니다.' });
         window.location.href = '../templates/index.html';
 
     } catch (err) {
-        console.error('에러 발생:', err);
-        Swal.fire({
-            icon: 'error',
-            title: '오류',
-            text: err.message
-        });
+        console.error('오류 상세:', err);
+        Swal.fire({ icon: 'error', title: '오류', text: err.message });
     }
 });
