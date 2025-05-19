@@ -2,40 +2,43 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock App - 로그인</title>
-  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/css/styles.css" />
 
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- Fernet.js (Python cryptography.fernet 호환) -->
-  <script src="https://cdn.jsdelivr.net/npm/fernet@0.8.0/fernet.min.js"></script>
-  <!-- (CryptoJS는 더 이상 사용하지 않습니다) -->
+  <!-- Browser-ready Fernet (fernetBrowser.js 파일을 /static/js 아래에 두고 사용) -->
+  <script src="/static/js/fernetBrowser.js"></script>
 </head>
 <body>
   <header>
     <div class="left-section">
       <a href="../templates/index.html" class="home-icon" title="홈으로 이동">
-        <!-- SVG 생략 -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
       </a>
     </div>
   </header>
+
   <main>
     <form id="login-form" class="signup-form">
       <h2>로그인</h2>
       <div class="form-group">
         <label for="user-email">이메일</label>
-        <input type="email" id="user-email" name="user_email" required>
+        <input type="email" id="user-email" name="user_email" required />
       </div>
       <div class="form-group">
         <label for="password">비밀번호</label>
-        <input type="password" id="password" name="user_password" required>
+        <input type="password" id="password" name="user_password" required />
       </div>
       <button type="submit" class="btn submit-btn">로그인</button>
     </form>
   </main>
 
-  <!-- login.js 는 defer 옵션으로 로드 -->
+  <!-- login.js (defer 속성으로 DOMContentLoaded 이후 실행) -->
   <script src="/static/js/login.js" defer></script>
 </body>
 </html>
