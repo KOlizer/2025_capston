@@ -1,15 +1,16 @@
 // login.js
-
-// DOM 이 로드된 후에 이벤트 바인딩
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('▶ login.js loaded and DOM ready');
+
   const form = document.getElementById('login-form');
   if (!form) {
-    console.error('login-form 이 존재하지 않습니다.');
+    console.error('⛔ login-form not found');
     return;
   }
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    console.log('🔹 login-form submit fired');
 
     // 1) 폼 데이터 수집
     const payload = {
@@ -29,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🔐 로그인 암호문:', encrypted_data);
 
     try {
-      // 3) 백엔드 /login 호출
+      // 3) /login 호출
       const res  = await fetch('http://61.109.236.163:8000/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
