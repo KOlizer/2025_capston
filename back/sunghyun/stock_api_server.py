@@ -1,6 +1,6 @@
 import json
 import logging
-from flask import Flask, request, Response
+from flask import Flask, request, Response, session
 from flask_cors import CORS
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,6 +33,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base.metadata.create_all(bind=engine)
 
+app.secret_key = b"253bbcb4631251312d875d474a7e0929dcb591e2249964988115bf51cba04918"   # ★ 한 줄 추가
 # 암호화 키 & Fernet 객체
 ENCRYPTION_KEY = b'q5kq0nckcmfJsXvCx-P-nU3IOcT_odDndllXhcnyrY8='
 fernet = Fernet(ENCRYPTION_KEY)
@@ -107,6 +108,8 @@ def register():
     finally:
         session.close()
 
+from flask import session  # 파일 상단 import 문에 추가
+
 # -----------------------------
 # 로그인 엔드포인트
 # -----------------------------
@@ -118,40 +121,40 @@ def login():
         return json_response({"error": "encrypted_data가 누락되었습니다."}, 400)
 
     raw_token = data["encrypted_data"]
-    app.logger.debug("Login received token: %s", raw_token)
-    token = normalize_token(raw_token)
-    app.logger.debug("Login normalized token: %s", token)
+    token     = normalize_token(raw_token)
 
     try:
-        decrypted_str = fernet.decrypt(token.encode()).decode('utf-8')
-        app.logger.debug("Login decrypted payload: %s", decrypted_str)
-        payload = json.loads(decrypted_str)
+        decrypted_str = fernet.decrypt(token.encode()).decode("utf-8")
+        payload       = json.loads(decrypted_str)
     except InvalidToken:
-        app.logger.exception("InvalidToken during login decryption")
         return json_response({"error": "복호화 실패: InvalidToken"}, 400)
     except Exception as e:
-        app.logger.exception("Error during login decryption")
         return json_response({"error": f"복호화 실패: {type(e).__name__} {e}"}, 400)
 
-    # 이메일 기준으로 로그인
+    # 이메일 로그인
     user_email    = payload.get("user_email")
     user_password = payload.get("user_password")
     if not user_email or not user_password:
         return json_response({"error": "user_email와 user_password는 필수 입력입니다."}, 400)
 
-    session = SessionLocal()
+    db = SessionLocal()
     try:
-        user = session.query(User).filter_by(user_email=user_email).first()
+        user = db.query(User).filter_by(user_email=user_email).first()
         if not user:
             return json_response({"error": "이메일이 존재하지 않습니다."}, 404)
         if not check_password_hash(user.user_password, user_password):
             return json_response({"error": "비밀번호가 올바르지 않습니다."}, 401)
+
+        # 세션 발급
+        session.permanent = True               # PERMANENT_SESSION_LIFETIME 적용
+        session["user_id"] = user.user_id
+
         return json_response({"message": "로그인 성공"}, 200)
     except Exception as e:
         app.logger.exception("Error during login DB lookup")
         return json_response({"error": str(e)}, 500)
     finally:
-        session.close()
+        db.close()
 
 # -----------------------------
 # 즐겨찾기 조회
