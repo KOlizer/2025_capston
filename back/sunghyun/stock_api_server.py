@@ -279,5 +279,79 @@ def stock_search():
     except Exception as e:
         return json_response({"error": str(e)}, 500)
 
+# -----------------------------
+# 구독 상태(subscription) 업데이트 API
+# -----------------------------
+@app.route("/update_subscription", methods=["POST"])
+def update_subscription():
+    data = request.get_json()
+    if not data:
+        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+
+    user_id = data.get("user_id")
+    company_name = data.get("company_name")
+    subscription = data.get("subscription")
+
+    if user_id is None or company_name is None or subscription is None:
+        return json_response({"error": "user_id, company_name, 및 subscription 필드가 필요합니다."}, 400)
+
+    session = SessionLocal()
+    try:
+        fav = session.query(Favorite).filter_by(user_id=user_id, company_name=company_name).first()
+        if fav:
+            fav.subscription = subscription
+            message = "구독 상태가 업데이트되었습니다."
+        else:
+            new_fav = Favorite(
+                user_id=user_id,
+                company_name=company_name,
+                subscription=subscription,
+                notification=False  # 기본값 False 또는 필요 시 True로 설정
+            )
+            session.add(new_fav)
+            message = "구독 항목이 새로 생성되었습니다."
+
+        session.commit()
+        return json_response({"message": message}, 200)
+    except Exception as e:
+        session.rollback()
+        app.logger.exception("Error during subscription upsert")
+        return json_response({"error": str(e)}, 500)
+    finally:
+        session.close()
+
+
+# -----------------------------
+# 알림 설정(notification) 업데이트 API
+# -----------------------------
+@app.route("/update_notification", methods=["POST"])
+def update_notification():
+    data = request.get_json()
+    if not data:
+        return json_response({"error": "JSON 데이터가 제공되지 않았습니다."}, 400)
+
+    user_id = data.get("user_id")
+    company_name = data.get("company_name")
+    notification = data.get("notification")
+
+    if user_id is None or company_name is None or notification is None:
+        return json_response({"error": "user_id, company_name, 및 notification 필드가 필요합니다."}, 400)
+
+    session = SessionLocal()
+    try:
+        fav = session.query(Favorite).filter_by(user_id=user_id, company_name=company_name).first()
+        if not fav:
+            return json_response({"error": "즐겨찾기 항목이 존재하지 않습니다."}, 404)
+
+        fav.notification = notification
+        session.commit()
+        return json_response({"message": "알림 설정이 업데이트되었습니다."}, 200)
+    except Exception as e:
+        session.rollback()
+        app.logger.exception("Error during notification update")
+        return json_response({"error": str(e)}, 500)
+    finally:
+        session.close()
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
