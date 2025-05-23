@@ -39,7 +39,7 @@ class Favorite(Base):
     
     user_id = Column(String(50), ForeignKey("user.user_id"), primary_key=True)
     company_name = Column(String(255), primary_key=True)
-    subscriptoin = Column(Boolean, default=False)
+    subscription = Column(Boolean, default=False)
     notification = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="favorites")
