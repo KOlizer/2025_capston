@@ -17,7 +17,7 @@ from models import User, Favorite, TopStock
 
 # Flask 앱 초기화
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG)
