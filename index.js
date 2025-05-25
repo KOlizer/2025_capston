@@ -243,15 +243,15 @@ async function toggleFavorite(ticker) {
     const isFavorited = favorites.includes(ticker);
     try {
         if (isFavorited) {
-            const response = await fetch(`${BASE_URL}/favorites/${ticker}?user_id=${userId}`, {
-                method: 'DELETE',
+            const response = await fetch(`${BASE_URL}/update_subscription/${ticker}?user_id=${userId}`, {
+                method: 'POST',
                 credentials: 'include'
             });
             if (!response.ok) throw new Error('즐겨찾기 삭제 실패');
             favorites = favorites.filter(t => t !== ticker);
         } else {
             const stock = stocks.find(s => s.ticker === ticker);
-            const response = await fetch(`${BASE_URL}/favorites`, {
+            const response = await fetch(`${BASE_URL}/update_subscription`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -259,7 +259,7 @@ async function toggleFavorite(ticker) {
                     user_id: userId,
                     company_name: stock.name,
                     subscription: ticker,
-                    notification: false
+                    notification: true
                 })
             });
             if (!response.ok) throw new Error('즐겨찾기 추가 실패');
