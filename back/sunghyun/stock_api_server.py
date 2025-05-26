@@ -149,12 +149,17 @@ def login():
         session.permanent = True               # PERMANENT_SESSION_LIFETIME 적용
         session["user_id"] = user.user_id
 
-        return json_response({"message": "로그인 성공"}, 200)
+        return json_response({
+            "message": "로그인 성공",
+            "user_id": user.user_id,  # 'postman01'
+            "user_email": user.user_email  # 'postman01@example.com'
+        }, 200)
     except Exception as e:
         app.logger.exception("Error during login DB lookup")
         return json_response({"error": str(e)}, 500)
     finally:
         db.close()
+
 
 # -----------------------------
 # 즐겨찾기 조회
