@@ -1,9 +1,8 @@
-const BASE_URL = 'http://61.109.236.163:8000'; // 백엔드 서버 주소
+const BASE_URL = 'http://61.109.236.163:8000';
 let stocks = [];
 let currentPage = 1;
 const rowsPerPage = 10;
 let currentSort = 'volume';
-let searchQuery = '';
 let favorites = [];
 let isSidebarOpen = false;
 let isSettingsSidebarOpen = false;
@@ -16,16 +15,14 @@ async function isLoggedIn() {
     const loginTime = parseInt(localStorage.getItem('loginTime') || '0', 10);
     const sessionDuration = 24 * 60 * 60 * 1000; // 24시간
 
-    // 로컬 상태 확인
     if (isLoggedInLocal !== 'true' || !userEmail || (Date.now() - loginTime) >= sessionDuration) {
         localStorage.removeItem('user_email');
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('loginTime');
-        localStorage.removeItem('user_id'); // 이전 호환성
+        localStorage.removeItem('user_id');
         return false;
     }
 
-    // 서버 세션 확인
     try {
         const response = await fetch(`${BASE_URL}/check-auth`, {
             method: 'GET',
@@ -34,20 +31,13 @@ async function isLoggedIn() {
         });
         const result = await response.json();
         if (response.ok && result.message === '인증됨') {
-            // 백엔드에서 user_email 또는 user_id 반환 시 로컬 상태 동기화
-            if (result.user_email) {
-                localStorage.setItem('user_email', result.user_email);
-            }
-            if (result.user_id) {
-                localStorage.setItem('user_id', result.user_id);
-            }
+            if (result.user_email) localStorage.setItem('user_email', result.user_email);
+            if (result.user_id) localStorage.setItem('user_id', result.user_id);
             return true;
-        } else {
-            throw new Error(result.error || '인증되지 않음');
         }
+        throw new Error(result.error || '인증되지 않음');
     } catch (err) {
         console.error('Error checking auth:', err);
-        // /check-auth가 없거나 에러 시 로컬 상태에 의존
         return isLoggedInLocal === 'true' && userEmail;
     }
 }
@@ -173,7 +163,6 @@ async function fetchStocks() {
         });
         if (!response.ok) throw new Error('주식 데이터 조회 실패');
         const data = await response.json();
-        console.log('Fetched stocks:', data.top_stocks); // 디버깅 로그
         stocks = data.top_stocks.map((stock, index) => ({
             id: index + 1,
             ticker: stock.ticker,
@@ -194,7 +183,7 @@ async function fetchStocks() {
 
 // 즐겨찾기 목록 조회
 async function fetchFavorites() {
-    const userId = localStorage.getItem('user_id') || localStorage.getItem('user_email');
+    const userId = localStorage.getItem('user_id');
     if (!userId) return;
     try {
         const response = await fetch(`${BASE_URL}/favorites?user_id=${userId}`, {
@@ -202,22 +191,26 @@ async function fetchFavorites() {
         });
         if (!response.ok) throw new Error(`즐겨찾기 조회 실패: ${response.status}`);
         const data = await response.json();
-        console.log('Fetched favorites:', data); // 디버깅 로그
-        // 데이터가 배열인지 확인, 배열이 아니면 빈 배열로 처리
-        favorites = Array.isArray(data) ? data.map(fav => fav.subscription) : [];
-        if (isSidebarOpen) {
-            renderFavorites();
+        console.log('Fetched favorites from server:', data);
+        if (Array.isArray(data) && data.length > 0) {
+            favorites = data
+                .filter(fav => fav.subscription)
+                .map(fav => {
+                    // ticker가 있으면 사용, 없으면 company_name으로 stocks에서 매핑
+                    if (fav.ticker) return fav.ticker;
+                    const stock = stocks.find(s => s.name === fav.company_name);
+                    return stock ? stock.ticker : null;
+                })
+                .filter(ticker => ticker); // null 제거
+        } else {
+            console.warn('No valid favorites data from server, retaining local favorites:', favorites);
         }
+        if (isSidebarOpen) renderFavorites();
         loadStocks();
     } catch (err) {
         console.error('즐겨찾기 조회 실패:', err);
-        // 빈 리스트는 에러로 처리하지 않음
-        favorites = [];
-        if (isSidebarOpen) {
-            renderFavorites();
-        }
+        if (isSidebarOpen) renderFavorites(); // 기존 favorites로 렌더링 유지
         loadStocks();
-        // 실제 서버 에러일 때만 메시지 표시
         if (err.message !== '즐겨찾기 조회 실패: 404') {
             Swal.fire({
                 icon: 'error',
@@ -239,47 +232,90 @@ async function toggleFavorite(ticker) {
         return;
     }
 
-    const userId = localStorage.getItem('user_id') || localStorage.getItem('user_email');
+    const userId = localStorage.getItem('user_id');
+    if (!userId) {
+        Swal.fire({
+            icon: 'error',
+            title: '오류',
+            text: '사용자 ID를 찾을 수 없습니다. 다시 로그인해 주세요.',
+        });
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('user_email');
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('loginTime');
+        updateUI();
+        window.location.href = '../templates/login.html';
+        return;
+    }
+
+    const stock = stocks.find(s => s.ticker === ticker);
+    if (!stock) {
+        Swal.fire({
+            icon: 'error',
+            title: '오류',
+            text: '해당 종목을 찾을 수 없습니다.',
+        });
+        return;
+    }
+
     const isFavorited = favorites.includes(ticker);
     try {
+        const response = await fetch(`${BASE_URL}/update_subscription`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                user_id: userId,
+                ticker: stock.ticker, // ticker 필드 추가
+                company_name: stock.name,
+                subscription: !isFavorited
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            if (response.status === 404) {
+                Swal.fire({
+                    icon: 'error',
+                    title: '오류',
+                    text: '사용자 계정을 찾을 수 없습니다. 다시 로그인해 주세요.',
+                });
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('user_email');
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('loginTime');
+                updateUI();
+                window.location.href = '../templates/login.html';
+                return;
+            }
+            throw new Error(errorData.error || '즐겨찾기 처리 실패');
+        }
+
+        // 로컬 favorites 배열 즉시 업데이트
         if (isFavorited) {
-            const response = await fetch(`${BASE_URL}/update_subscription/${ticker}?user_id=${userId}`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-            if (!response.ok) throw new Error('즐겨찾기 삭제 실패');
             favorites = favorites.filter(t => t !== ticker);
         } else {
-            const stock = stocks.find(s => s.ticker === ticker);
-            const response = await fetch(`${BASE_URL}/update_subscription`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    user_id: userId,
-                    company_name: stock.name,
-                    subscription: ticker,
-                    notification: true
-                })
-            });
-            if (!response.ok) throw new Error('즐겨찾기 추가 실패');
             favorites.push(ticker);
         }
+
+        // UI 즉시 갱신
         loadStocks();
-        if (isSidebarOpen) {
-            renderFavorites();
-        }
+        renderFavorites();
+
         Swal.fire({
             icon: 'success',
             title: isFavorited ? '즐겨찾기 해제' : '즐겨찾기 등록',
             text: `종목 ${ticker}이 ${isFavorited ? '즐겨찾기에서 제거되었습니다.' : '즐겨찾기에 추가되었습니다.'}`,
         });
+
+        // 백그라운드에서 즐겨찾기 목록 동기화
+        setTimeout(fetchFavorites, 0);
     } catch (err) {
         console.error('즐겨찾기 처리 실패:', err);
         Swal.fire({
             icon: 'error',
             title: '오류',
-            text: `즐겨찾기 ${isFavorited ? '삭제' : '추가'}에 실패했습니다.`,
+            text: `즐겨찾기 ${isFavorited ? '삭제' : '추가'}에 실패했습니다: ${err.message}`,
         });
     }
 }
@@ -291,23 +327,29 @@ function renderFavorites() {
     if (favorites.length === 0) {
         const li = document.createElement('li');
         li.textContent = '즐겨찾기한 종목이 없습니다.';
+        li.style.color = '#666';
         favoritesList.appendChild(li);
+        console.log('Favorites is empty');
         return;
     }
+    console.log('Rendering favorites:', favorites); // 디버깅 로그
     favorites.forEach(ticker => {
         const stock = stocks.find(s => s.ticker === ticker);
         if (stock) {
+            console.log(`Found stock for ticker ${ticker}:`, stock); // 디버깅 로그
             const li = document.createElement('li');
             li.className = 'favorite-item';
             li.innerHTML = `
                 <span>${stock.name}</span>
                 <button class="remove-favorite" onclick="event.stopPropagation(); toggleFavorite('${stock.ticker}')">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M17 3H7a2 2 0 0 0-2 2v16l7-5 7 5V5a2 2 0 0 0-2-2z" fill="${favorites.includes(stock.ticker) ? '#f00' : '#ccc'}"/>
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path d="M17 3H7a2 2 0 0 0-2 2v16l7-5 7 5V5a2 2 0 0 0-2-2z" fill="var(--favorite-active)" stroke="var(--favorite-active)"/>
                     </svg>
                 </button>
             `;
             favoritesList.appendChild(li);
+        } else {
+            console.warn(`Stock not found for ticker: ${ticker}`); // 디버깅 로그
         }
     });
 }
@@ -346,28 +388,23 @@ function loadStocks() {
     const stockList = document.getElementById('stock-list');
     stockList.innerHTML = '';
 
-    let filteredStocks = stocks.filter(stock =>
-        stock.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stock.ticker.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
+    let sortedStocks = [...stocks];
     if (currentSort === 'volume') {
-        filteredStocks.sort((a, b) => b.volume - a.volume);
+        sortedStocks.sort((a, b) => b.volume - a.volume);
     } else {
-        filteredStocks.sort((a, b) => b.price - a.price);
+        sortedStocks.sort((a, b) => b.price - a.price);
     }
 
-    const totalPages = Math.ceil(filteredStocks.length / rowsPerPage);
+    const totalPages = Math.ceil(sortedStocks.length / rowsPerPage);
     currentPage = Math.min(currentPage, totalPages || 1);
 
     const start = (currentPage - 1) * rowsPerPage;
     const end = start + rowsPerPage;
-    const paginatedStocks = filteredStocks.slice(start, end);
+    const paginatedStocks = sortedStocks.slice(start, end);
 
     paginatedStocks.forEach(stock => {
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
-        console.log(`Navigating to search.html with name: ${stock.name}`);
         row.onclick = () => window.location.href = `../templates/search.html?name=${encodeURIComponent(stock.name)}`;
         const isFavorited = favorites.includes(stock.ticker);
         row.innerHTML = `
@@ -377,8 +414,10 @@ function loadStocks() {
             <td>
                 <svg class="favorite-icon ${isFavorited ? 'favorite' : ''} ${!localStorage.getItem('isLoggedIn') ? 'disabled' : ''}" 
                      onclick="event.stopPropagation(); toggleFavorite('${stock.ticker}')"
-                     viewBox="0 0 24 24">
-                    <path d="M17 3H7a2 2 0 0 0-2 2v16l7-5 7 5V5a2 2 0 0 0-2-2z"/>
+                     viewBox="0 0 24 24" width="16" height="16">
+                    <path d="M17 3H7a2 2 0 0 0-2 2v16l7-5 7 5V5a2 2 0 0 0-2-2z" 
+                          fill="${isFavorited ? 'var(--favorite-active)' : 'var(--favorite-color)'}" 
+                          stroke="${isFavorited ? 'var(--favorite-active)' : 'var(--favorite-color)'}"/>
                 </svg>
             </td>
         `;
@@ -390,11 +429,20 @@ function loadStocks() {
     document.getElementById('next-btn').disabled = currentPage === totalPages;
 }
 
-// 검색
-function searchStocks() {
-    searchQuery = document.getElementById('search-bar').value;
-    currentPage = 1;
-    loadStocks();
+// 엔터 키로 검색 페이지 이동
+function handleSearchKeypress(event) {
+    if (event.key === 'Enter') {
+        const query = document.getElementById('search-bar').value.trim();
+        if (query) {
+            window.location.href = `../templates/search.html?name=${encodeURIComponent(query)}`;
+        } else {
+            Swal.fire({
+                icon: 'warning',
+                title: '입력 필요',
+                text: '검색어를 입력해주세요.',
+            });
+        }
+    }
 }
 
 // 정렬
@@ -413,12 +461,7 @@ function prevPage() {
 }
 
 function nextPage() {
-    const totalPages = Math.ceil(
-        stocks.filter(stock =>
-            stock.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            stock.ticker.toLowerCase().includes(searchQuery.toLowerCase())
-        ).length / rowsPerPage
-    );
+    const totalPages = Math.ceil(stocks.length / rowsPerPage);
     if (currentPage < totalPages) {
         currentPage++;
         loadStocks();
@@ -427,9 +470,7 @@ function nextPage() {
 
 // 새로고침 간격 설정
 function setRefreshInterval() {
-    if (refreshIntervalId) {
-        clearInterval(refreshIntervalId);
-    }
+    if (refreshIntervalId) clearInterval(refreshIntervalId);
     const interval = parseInt(document.getElementById('refresh-interval').value) * 1000;
     localStorage.setItem('refreshInterval', interval / 1000);
     if (interval > 0) {
@@ -442,7 +483,7 @@ function setDefaultRefreshInterval() {
     saveUserSettings();
 }
 
-// 새로고침 (API 호출로 주식 데이터 갱신)
+// 새로고침
 let startTime = Date.now();
 async function refreshPage() {
     startTime = Date.now();
@@ -453,19 +494,19 @@ async function refreshPage() {
 async function migrateLocalFavorites() {
     const localFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     if (localFavorites.length > 0 && localStorage.getItem('isLoggedIn') === 'true') {
-        const userId = localStorage.getItem('user_id') || localStorage.getItem('user_email');
+        const userId = localStorage.getItem('user_id');
         try {
             for (const ticker of localFavorites) {
                 const stock = stocks.find(s => s.ticker === ticker);
                 if (stock) {
-                    await fetch(`${BASE_URL}/favorites`, {
+                    await fetch(`${BASE_URL}/update_subscription`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({
                             user_id: userId,
                             company_name: stock.name,
-                            subscription: ticker,
+                            subscription: true,
                             notification: false
                         })
                     });
@@ -481,7 +522,6 @@ async function migrateLocalFavorites() {
 
 // 초기화
 document.addEventListener('DOMContentLoaded', async () => {
-    // 로그인 상태 확인
     if (!(await isLoggedIn())) {
         localStorage.removeItem('user_id');
         localStorage.removeItem('user_email');
@@ -489,14 +529,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         localStorage.removeItem('loginTime');
         updateUI();
         await fetchStocks();
-        /*Swal.fire({
-            icon: 'warning',
-            title: '로그인 필요',
-            text: '로그인 페이지로 이동합니다.',
-            willClose: () => {
-                window.location.href = '../templates/login.html';
-            }
-        });*/
         return;
     }
 
