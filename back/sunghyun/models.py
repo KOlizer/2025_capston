@@ -24,11 +24,12 @@ class TopStock(Base):
 class User(Base):
     __tablename__ = "user"
     
-    user_id = Column(String(50), primary_key=True)
-    user_name = Column(String(50), nullable=False)
+    user_id       = Column(String(50), primary_key=True)
+    user_name     = Column(String(50), nullable=False)
     user_password = Column(String(255), nullable=False)
-    user_email = Column(String(100), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    user_email    = Column(String(100), unique=True, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    refresh_time  = Column(DateTime, default=datetime.utcnow, nullable=True)  # 새로 추가된 컬럼
 
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
 
@@ -37,12 +38,12 @@ class User(Base):
 class Favorite(Base):
     __tablename__ = "favorite"
     
-    user_id = Column(String(50), ForeignKey("user.user_id"), primary_key=True)
+    user_id      = Column(String(50), ForeignKey("user.user_id"), primary_key=True)
     company_name = Column(String(255), primary_key=True)
     subscription = Column(Boolean, default=False)
     notification = Column(Boolean, default=False)
 
-    user = relationship("User", back_populates="favorites")
+    user      = relationship("User", back_populates="favorites")
     top_stock = relationship(
         "TopStock",
         back_populates="favorites",
