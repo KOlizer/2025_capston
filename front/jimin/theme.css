@@ -1,0 +1,78 @@
+[data-theme="dark"] body {
+    background: #1a1a1a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .logo a {
+    color: #1e90ff;
+}
+
+[data-theme="dark"] .refresh-section, [data-theme="dark"] .user-section {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] #search-bar {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border: 1px solid #444444;
+}
+
+[data-theme="dark"] button {
+    background: #1e90ff;
+}
+
+[data-theme="dark"] button:hover {
+    background: #1c86ee;
+}
+
+[data-theme="dark"] .theme-toggle {
+    background: #1e90ff;
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+    background: #1c86ee;
+}
+
+[data-theme="dark"] .tab {
+    background: #444444;
+}
+
+[data-theme="dark"] .tab.active {
+    background: #1e90ff;
+}
+
+[data-theme="dark"] table {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] th, [data-theme="dark"] td {
+    border: 1px solid #444444;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] th {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] form {
+    border: 1px solid #444444;
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] form label {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] form input {
+    border: 1px solid #444444;
+    background: #2a2a2a;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] form button {
+    background: #1e90ff;
+}
+
+[data-theme="dark"] form button:hover {
+    background: #1c86ee;
+}
