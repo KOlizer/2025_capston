@@ -399,14 +399,22 @@ def send_email(subject, body, receiver_email):
     with smtplib.SMTP_SSL('smtp.gmail.com',465) as server:
         server.login('rladbswls9024@gmail.com','lmko ygnl drdb tkll')
         server.send_message(msg)
-
+        
 def check_and_notify(ticker, receiver_email):
     sig, rs = get_stock_signal(ticker)
-    if sig in ['BUY','SELL','HOLD']:
-        subj=f"[{ticker}] {sig} 신호"
-        body=f"📃 종목: {ticker}\n📈 신호: {sig}\n📝 사유:\n- {'\n- '.join(rs)}"
-        send_email(subj,body,receiver_email)
-    return {'status':'sent','signal':sig,'reasons':rs}
+    # BUY 또는 SELL 신호일 때만 메일 전송
+    if sig in ['BUY', 'SELL']:
+        subj = f"[{ticker}] {sig} 신호"
+        body = f"📃 종목: {ticker}\n📈 신호: {sig}\n📝 사유:\n- {'\n- '.join(rs)}"
+        try:
+            send_email(subj, body, receiver_email)
+            return {'status': 'sent', 'signal': sig, 'reasons': rs}
+        except Exception as e:
+            app.logger.exception(f"이메일 전송 실패 [{ticker}]: {e}")
+            return {'status': 'error', 'signal': sig, 'reasons': [f"❌ 이메일 전송 실패: {e}"]}
+    # HOLD 또는 에러인 경우 메일 전송하지 않음
+    return {'status': 'skipped', 'signal': sig, 'reasons': rs}
+
 
 # -----------------------------
 # 주기적 감지 및 알림
