@@ -92,8 +92,13 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         // 로컬 상태 저장
         localStorage.setItem('user_id', result.user_id); // user_id 저장 추가
         localStorage.setItem('user_email', result.user_email || payload.user_email);
+        // 디폴트 새로고침 local에 추가
+        localStorage.setItem('refresh_time', result.refresh_time);
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('loginTime', Date.now().toString());
+
+        // 로컬스토리지 상태 확인
+        console.log(localStorage.getItem('user_id'), localStorage.getItem('user_email'), localStorage.getItem('refresh_time'), localStorage.getItem('isLoggedIn'), localStorage.getItem('loginTime'))
 
         await Swal.fire({
             icon: 'success',
