@@ -47,10 +47,9 @@ function loadUserSettings() {
     const userId = localStorage.getItem('user_id') || localStorage.getItem('user_email');
     if (userId) {
         const settings = JSON.parse(localStorage.getItem(`settings_${userId}`) || '{}');
-        const defaultRefreshInterval = settings.defaultRefreshInterval || '0';
+        const defaultRefreshInterval = localStorage.getItem('refresh_time') || '0';
         document.getElementById('default-refresh-interval').value = defaultRefreshInterval;
-        const refreshInterval = localStorage.getItem('refreshInterval') || '0';
-        document.getElementById('refresh-interval').value = refreshInterval;
+        document.getElementById('refresh-interval').value = defaultRefreshInterval ;
         setRefreshInterval();
         if (settings.theme === 'dark') {
             document.body.classList.add('dark-mode');
@@ -479,8 +478,61 @@ function setRefreshInterval() {
 }
 
 // 사이드바 기본 새로고침 간격 설정
-function setDefaultRefreshInterval() {
-    saveUserSettings();
+async function setDefaultRefreshInterval() {
+    const userId = localStorage.getItem('user_id');
+    const defaultRefreshTime = document.getElementById('default-refresh-interval').value;
+
+    if(userId){
+        try{
+            const response = await fetch(`${BASE_URL}/update_refresh_time`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    user_id: userId,
+                    refresh_time: parseInt(defaultRefreshTime)
+                })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                if (response.status === 404) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: '오류',
+                        text: '사용자 계정을 찾을 수 없습니다. 다시 로그인해 주세요.'
+                    });
+                    localStorage.removeItem('user_id');
+                    localStorage.removeItem('user_email');
+                    localStorage.removeItem('isLoggedIn');
+                    localStorage.removeItem('loginTime');
+                    updateUI();
+                    window.location.href = '../templates/login.html';
+                    return;
+                }
+                throw new Error(result.error || 'refresh_time 업데이트 실패');
+            }
+
+            // 성공 시 DB에만 저장하고 localStorage/UI는 변경하지 않음
+            Swal.fire({
+                icon: 'success',
+                title: '설정 저장',
+                text: '기본 새로고침 간격이 서버에 저장되었습니다.'
+            });
+        } catch (err) {
+            console.error('refresh_time 업데이트 실패:', err);
+            Swal.fire({
+                icon: 'error',
+                title: '오류',
+                text: `기본 새로고침 간격 업데이트 실패: ${err.message}`
+            });
+        }
+    } else {
+        Swal.fire({
+            icon: 'warning',
+            title: '로그인 필요',
+            text: '기본 새로고침 간격 설정은 로그인 후 가능합니다.'
+        });
+    }
 }
 
 // 새로고침
