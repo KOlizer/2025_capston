@@ -28,31 +28,7 @@ async function isLoggedIn() {
         localStorage.removeItem('user_id');
         return false;
     }
-
-    try {
-        console.log('Sending /check-auth request');
-        const response = await fetch(`${BASE_URL}/check-auth`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-        const result = await response.json();
-        console.log('Auth check response:', { status: response.status, result });
-
-        if (response.ok && result.message === '인증됨') {
-            if (result.user_email) localStorage.setItem('user_email', result.user_email);
-            if (result.user_id) localStorage.setItem('user_id', result.user_id);
-            return true;
-        }
-        throw new Error(result.error || '인증되지 않음');
-    } catch (err) {
-        console.error('Error checking auth:', err.message);
-        localStorage.removeItem('user_email');
-        localStorage.removeItem('isLoggedIn');
-        localStorage.removeItem('loginTime');
-        localStorage.removeItem('user_id');
-        return false;
-    }
+        return true;
 }
 
 // 사용자 설정 로드
@@ -81,17 +57,6 @@ async function saveUserSettings() {
             theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
         };
         localStorage.setItem(`settings_${userId}`, JSON.stringify(settings));
-        try {
-            const response = await fetch(`${BASE_URL}/api/user/settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ userId, settings })
-            });
-            if (!response.ok) throw new Error('DB 저장 실패');
-        } catch (err) {
-            console.error('DB 저장 실패:', err);
-        }
     }
 }
 
@@ -426,10 +391,10 @@ async function displaySearchResults() {
                     </button>
                     <button class="notification-icon ${isNotified ? 'notified' : ''} ${!localStorage.getItem('isLoggedIn') ? 'disabled' : ''}" 
                             onclick="toggleNotification('${stock.ticker}', '${stock.company_name || 'N/A'}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4l4 4 4-4h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-2 10H6v-2h12v2zm0-4H6V6h12v2z"/>
-                        </svg>
-                    </button>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.1-1.6-5.8-4-6.7V4c0-1.1-.9-2-2-2s-2 .9-2 2v.3c-2.4.9-4 3.6-4 6.7v5l-2 2v1h16v-1l-2-2z"/>
+                            </svg>
+</button>
                 </td>
                 <td>
                     <table class="detail-table">
