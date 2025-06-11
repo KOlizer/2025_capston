@@ -28,7 +28,7 @@ async function isLoggedIn() {
         localStorage.removeItem('user_id');
         return false;
     }
-        return true;
+    return true;
 }
 
 // 사용자 설정 로드
@@ -277,6 +277,7 @@ async function toggleNotification(ticker, companyName) {
 
     const userId = localStorage.getItem('user_id');
     const isNotified = notifications[ticker] || false;
+    const button = document.querySelector(`.notification-icon[data-ticker="${ticker}"]`);
 
     try {
         const response = await fetch(`${BASE_URL}/update_notification`, {
@@ -294,6 +295,12 @@ async function toggleNotification(ticker, companyName) {
 
         notifications[ticker] = !isNotified;
         localStorage.setItem('notifications', JSON.stringify(notifications));
+
+        // 버튼의 notified 클래스 토글
+        if (button) {
+            button.classList.toggle('notified', !isNotified);
+        }
+
         await displaySearchResults();
         Swal.fire({ icon: 'success', title: '알림 설정', text: `알림이 ${isNotified ? '해제' : '설정'}되었습니다.` });
     } catch (err) {
@@ -391,10 +398,10 @@ async function displaySearchResults() {
                     </button>
                     <button class="notification-icon ${isNotified ? 'notified' : ''} ${!localStorage.getItem('isLoggedIn') ? 'disabled' : ''}" 
                             onclick="toggleNotification('${stock.ticker}', '${stock.company_name || 'N/A'}')">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.1-1.6-5.8-4-6.7V4c0-1.1-.9-2-2-2s-2 .9-2 2v.3c-2.4.9-4 3.6-4 6.7v5l-2 2v1h16v-1l-2-2z"/>
-                            </svg>
-</button>
+                        <svg width="16" height="16" viewBox="0 0 24 24">
+                            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.1-1.6-5.8-4-6.7V4c0-1.1-.9-2-2-2s-2 .9-2 2v.3c-2.4.9-4 3.6-4 6.7v5l-2 2v1h16v-1l-2-2z"/>
+                        </svg>
+                    </button>
                 </td>
                 <td>
                     <table class="detail-table">
