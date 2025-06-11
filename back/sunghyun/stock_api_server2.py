@@ -150,14 +150,22 @@ def login():
             return json_response({"error": "존재하지 않는 이메일"}, 404)
         if not check_password_hash(user.user_password, pw):
             return json_response({"error": "비밀번호 불일치"}, 401)
+
+        # refresh_time 값 확인 (NULL이면 60으로 설정)
+        rt = user.refresh_time if user.refresh_time is not None else 60
+
         session.permanent = True
         session["user_id"] = user.user_id
-        return json_response({"message": "로그인 성공", "user_id": user.user_id, "user_email": user.user_email})
+        return json_response({
+            "message": "로그인 성공",
+            "user_id": user.user_id,
+            "user_email": user.user_email,
+            "refresh_time": rt
+        })
     except Exception as e:
         return json_response({"error": str(e)}, 500)
     finally:
         db.close()
-
 # -----------------------------
 # 즐겨찾기 조회
 # -----------------------------
