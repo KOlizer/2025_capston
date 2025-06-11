@@ -17,35 +17,13 @@ async function isLoggedIn() {
     const sessionDuration = 24 * 60 * 60 * 1000; // 24시간
 
     if (isLoggedInLocal !== 'true' || (!userEmail &&  !userId)|| (Date.now() - loginTime) >= sessionDuration) {
-        /*
         localStorage.removeItem('user_email');
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('loginTime');
         localStorage.removeItem('user_id');
-         */
-        console.log('세션 문제로 로컬스토리지 삭제부분 삭제')
         return false;
     }
-
-    try {
-        const response = await fetch(`${BASE_URL}/check-auth`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
-        });
-        const result = await response.json();
-        if (response.ok && result.message === '인증됨') {
-            if (result.user_email) localStorage.setItem('user_email', result.user_email);
-            if (result.user_id) localStorage.setItem('user_id', result.user_id);
-            return true;
-        }
-        cosole.warn('Auth check failed, retaining local session.')
         return true;
-        // throw new Error(result.error || '인증되지 않음')
-    } catch (err) {
-        console.error('Error checking auth:', err);
-        return isLoggedInLocal === 'true' && (userEmail || userId);
-    }
 }
 
 // 사용자 설정 로드
@@ -78,17 +56,6 @@ async function saveUserSettings() {
             theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
         };
         localStorage.setItem(`settings_${userId}`, JSON.stringify(settings));
-        try {
-            const response = await fetch(`${BASE_URL}/api/user/settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ userId, settings })
-            });
-            if (!response.ok) throw new Error('DB 저장 실패');
-        } catch (err) {
-            console.error('DB 저장 실패:', err);
-        }
     }
 }
 
@@ -387,53 +354,7 @@ function toggleSettingsSidebar() {
         header.classList.remove('settings-sidebar-open');
     }
 }
-/*
-// 주식 목록 렌더링
-function loadStocks() {
-    const stockList = document.getElementById('stock-list');
-    stockList.innerHTML = '';
 
-    let sortedStocks = [...stocks];
-    if (currentSort === 'volume') {
-        sortedStocks.sort((a, b) => b.volume - a.volume);
-    } else {
-        sortedStocks.sort((a, b) => b.price - a.price);
-    }
-
-    const totalPages = Math.ceil(sortedStocks.length / rowsPerPage);
-    currentPage = Math.min(currentPage, totalPages || 1);
-
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    const paginatedStocks = sortedStocks.slice(start, end);
-
-    paginatedStocks.forEach(stock => {
-        const row = document.createElement('tr');
-        row.style.cursor = 'pointer';
-        row.onclick = () => window.location.href = `../templates/originalSearch.html?name=${encodeURIComponent(stock.name)}`;
-        const isFavorited = favorites.includes(stock.ticker);
-        row.innerHTML = `
-            <td>${stock.name}</td>
-            <td>${stock.price.toFixed(2)}</td>
-            <td>${stock.volume.toLocaleString()}</td>
-            <td>
-                <svg class="favorite-icon ${isFavorited ? 'favorite' : ''} ${!localStorage.getItem('isLoggedIn') ? 'disabled' : ''}" 
-                     onclick="event.stopPropagation(); toggleFavorite('${stock.ticker}')"
-                     viewBox="0 0 24 24" width="16" height="16">
-                    <path d="M17 3H7a2 2 0 0 0-2 2v16l7-5 7 5V5a2 2 0 0 0-2-2z" 
-                          fill="${isFavorited ? 'var(--favorite-active)' : 'var(--favorite-color)'}" 
-                          stroke="${isFavorited ? 'var(--favorite-active)' : 'var(--favorite-color)'}"/>
-                </svg>
-            </td>
-        `;
-        stockList.appendChild(row);
-    });
-
-    document.getElementById('page-info').textContent = `${currentPage} / ${totalPages || 1}`;
-    document.getElementById('prev-btn').disabled = currentPage === 1;
-    document.getElementById('next-btn').disabled = currentPage === totalPages;
-}
-*/
 async function fetchSearchResults(companyName) {
     try {
         console.log(`Fetching search results for: ${companyName}`);
@@ -595,22 +516,7 @@ function loadStocks() {
     document.getElementById('prev-btn').disabled = currentPage === 1;
     document.getElementById('next-btn').disabled = currentPage === totalPages;
 }
-// 엔터 키로 검색 페이지 이동
-/*
-function handleSearchKeypress(event) {
-    if (event.key === 'Enter') {
-        const query = document.getElementById('search-bar').value.trim();
-        if (query) {
-            window.location.href = `../../templates/search.html`;
-        } else {
-            Swal.fire({
-                icon: 'warning',
-                title: '입력 필요',
-                text: '검색어를 입력해주세요.',
-            });
-        }
-    }
-} */
+
 function handleSearchKeypress(event) {
     if (event.key === 'Enter') {
         const query = document.getElementById('search-bar').value.trim();
@@ -756,12 +662,11 @@ async function migrateLocalFavorites() {
 // 초기화
 document.addEventListener('DOMContentLoaded', async () => {
     if (!(await isLoggedIn())) {
-        /*
+
         localStorage.removeItem('user_id');
         localStorage.removeItem('user_email');
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('loginTime');
-         */
         updateUI();
         await fetchStocks();
         return;
