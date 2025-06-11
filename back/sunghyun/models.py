@@ -29,7 +29,7 @@ class User(Base):
     user_password = Column(String(255), nullable=False)
     user_email    = Column(String(100), unique=True, nullable=False)
     created_at    = Column(DateTime, default=datetime.utcnow)
-    refresh_time  = Column(DateTime, default=datetime.utcnow, nullable=True)  # 새로 추가된 컬럼
+    refresh_time  = Column(Integer, default=30, nullable=True)  # 새로 추가된 컬럼
 
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
 
