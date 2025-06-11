@@ -11,8 +11,8 @@
     --btn-hover: #0056b3;
     --favorite-color: #ccc;
     --favorite-active: #ffc107;
-    --notification-color: #17a2b8;
-    --notification-active: #138496;
+    --notification-color: #ccc;
+    --notification-active: #ffc107;
     --sidebar-bg: #fff;
     --sidebar-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -30,8 +30,8 @@ body.dark-mode {
     --btn-hover: #1557b0;
     --favorite-color: #666;
     --favorite-active: #ffb300;
-    --notification-color: #17a2b8;
-    --notification-active: #138496;
+    --notification-color: #666;
+    --notification-active: #ffb300;
     --sidebar-bg: #444;
     --sidebar-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -545,18 +545,17 @@ main {
     cursor: pointer;
     width: 16px;
     height: 16px;
-    fill: none; /* Empty (no fill) by default */
-    stroke: var(--notification-color, #6b7280); /* Gray outline */
+    fill: var(--notification-color);
+    stroke: none;
     vertical-align: middle;
     background: none;
     border: none;
     padding: 0;
     margin-left: 5px;
-    transition: fill 0.2s ease, stroke 0.2s ease; /* Smooth transition for fill and stroke */
 }
 
 .notification-icon.notified {
-    fill: var(--notification-active, #eab308); /* Yellow fill when active */
+    fill: var(--notification-active, #ffc107); /* Yellow fill when active */
     stroke: none; /* No outline when active */
 }
 
