@@ -109,15 +109,4 @@
 
 <br><br>
 
-## 구현 사진
-<a href="/docs/구현 사진/README.md" target="_blank">구현 사진</a>
 
-<br><br>
-
-## 소프트웨어 설계
-<a href="/docs/소프트웨어 설계/README.md" target="_blank">소프트웨어 설계</a>
-
-<br><br>
-
-## PMS 레퍼런스 (Monday.dev)
-<a href="/docs/PMS 레퍼런스 사진 모음/README.md" target="_blank">PMS 레퍼런스 (Monday.dev)</a>
