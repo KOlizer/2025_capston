@@ -62,13 +62,10 @@
    python -m venv venv
    source venv/bin/activate  # Windows는 venv\Scripts\activate
    pip install -r requirements.txt
-3. MySQL에서 DB 생성
-    ```bash
-    CREATE DATABASE stock_data;
-4. 백엔드 서버 실행
+3. 백엔드 서버 실행
     ```bash
     python app.py
-5. 웹 브라우저에서 확인
+4. 웹 브라우저에서 확인
     http://localhost:5000 접속
 
 
