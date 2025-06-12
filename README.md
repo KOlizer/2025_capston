@@ -6,13 +6,12 @@
 ##### 프로젝트 소개  
 미국 주식 시장의 주가 데이터를 주시적으로 수집하여, 이를 데이터베이스에 저장한 후 사용자에게 웹 기반 인터페이스를 통해 시각화 된 정보를 제공하는 시스템입니다.  
 크롤링으로 주식 정보를 데이터 베이스에 저장하고, 서버를 구축하여 사용자가 요청하는 정보를 보여줍니다. 
-https://avatars.githubusercontent.com/u/128346343?v=4
 <br><br>
 
 ## 팀원 
 |김윤진|이성현|이지민|정채원|
 |:---:|:---:|:---:|:---:|
-|<a href="https://github.com/yunndaeng" target="_blank"><img src="https://avatars.githubusercontent.com/u/193191038?v=4" height="150px"/><br>yunndaeng</a>|<a href="https://github.com/KOlizer" target="_blank"><img src="https://avatars.githubusercontent.com/u/127844467?v=4" height="150px"/><br>KOlizer</a>|<a href="https://github.com/jimnyy0" target="_blank"><img src="https://avatars.githubusercontent.com/u/204986312?v=4" height="150px"/><br>jimnyy0</a>|<a href="https://github.com/gqwerty" target="_blank"><img src="https://avatars.githubusercontent.com/u/133009070?v=4" height="150px"/><br>gqwerty</a>|
+|<a href="https://github.com/yunndaeng" target="_blank"><img src="https://avatars.githubusercontent.com/u/193191038?v=4" height="150px"/><br>yunndaeng</a>|<a href="https://github.com/KOlizer" target="_blank"><img src="https://avatars.githubusercontent.com/u/127844467?v=4" height="150px"/><br>KOlizer</a>|<a href="https://github.com/jimnyy0" target="_blank"><img src="https://avatars.githubusercontent.com/u/204986312?v=4" height="150px"/><br>jimnyy0</a>|<a href="https://github.com/gqwerty" target="_blank"><img src="https://avatars.githubusercontent.com/u/128346343?v=4" height="150px"/><br>gqwerty</a>|
 
 #### 맡은 역할
 
@@ -68,6 +67,20 @@ https://avatars.githubusercontent.com/u/128346343?v=4
 <br><br>
 
 ## 실행 및 개발 환경 구축 방법
+### 📁 DB 설정 정보
+
+- DB 엔진: MySQL 8.0.41  
+- 호스트: az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5.mysql.managed-service.kr-central-2.kakaocloud.com  
+- 포트: 3306  
+- 사용자: admin  
+- 비밀번호: admin1234  
+- DB 이름: capston  
+
+💡 사용 예시 (SQLAlchemy용):
+
+```bash
+mysql+pymysql://admin:admin1234@az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5.mysql.managed-service.kr-central-2.kakaocloud.com:3306/capston
+```
 
 ### 🔧 백엔드 실행 방법
 1. Python 3.9 설치 ([https://www.python.org](https://www.python.org))
@@ -81,7 +94,7 @@ https://avatars.githubusercontent.com/u/128346343?v=4
     ```bash
     python app.py
 4. 웹 브라우저에서 확인
-    http://localhost:5000 접속
+    http://localhost:8000 접속
 
 
 ### 💻 프론트엔드 실행 방법
@@ -94,3 +107,4 @@ https://avatars.githubusercontent.com/u/128346343?v=4
 python -m http.server 3000
 4. 웹 브라우저에서 확인
 http://localhost:3000/login2.html 접속
+
