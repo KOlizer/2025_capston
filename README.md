@@ -1,14 +1,13 @@
 ## 미국 주식 가격 수집기 Project
 <div style="text-align: center;">
     <img width="1500" alt="image" src="https://github.com/user-attachments/assets/71533676-4a79-454d-86b0-63ef74f4c290" />
-
 </div>
 
-##### 프로젝트 소개
-미국 주식 시장의 주가 데이터를 주시적으로 수집하여, 이를 데이터베이스에 저장한 후 사용자에게 웹 기반 인터페이스를 통해 시각화 된 정보를 제공하는 시스템입니다.  크롤링으로 주식 정보를 데이터 베이스에 저장하고, 서버를 구축하여 사용자가 요청하는 정보를 보여줍니다. 
-<br>
-<br>
-<br>
+##### 프로젝트 소개  
+미국 주식 시장의 주가 데이터를 주시적으로 수집하여, 이를 데이터베이스에 저장한 후 사용자에게 웹 기반 인터페이스를 통해 시각화 된 정보를 제공하는 시스템입니다.  
+크롤링으로 주식 정보를 데이터 베이스에 저장하고, 서버를 구축하여 사용자가 요청하는 정보를 보여줍니다. 
+
+<br><br>
 
 ## 팀원 
 |김윤진|이성현|이지민|정채원|
@@ -25,6 +24,7 @@
 | 정채원 | 프론트 엔드: css / 메인 디자인 / 로그인, 회원가입 화면 / 작업 추가, 삭제, 수정 버튼 / 대시보드 목록 / 대시보드 추가와 수정 모달 / AI 챗봇 <br>백엔드: 작업 추가, 삭제, 수정 / 회원 추가, 조회, 탈퇴 / 대시보드 추가, 삭제, 수정, 조회 / 동료 추가, 삭제, 조회 <br>기타: 발표 / 발표자료 / Sequence Diagram / ERD / DB 설계 / SQL문 작성 / 리드미 작성 |
 
 <br><br>
+
 ## 개발환경
 
 |         OS          |         Server         |      CSP      |     IDE     |
@@ -50,63 +50,35 @@
 | IDE | <img src="https://img.shields.io/badge/VSCode-007ACC?style=for-the-badge&logo=visual-studio-code&logoColor=white"/> | Visual Studio Code |
 | CSP | <img src="https://img.shields.io/badge/Kakao_Cloud-FFCD00?style=for-the-badge&logo=kakao&logoColor=black"/> | Kakao Cloud |
 
-
-
-<br><br>
-## 요구사항
-
-<div style="text-align: center;">
-    <img height="500px" src="/docs/소프트웨어 설계/요구 사항.png" alt="alt text" />
-</div>
-
-#### 요구사항 분석(기능 정리)
-|요구사항|상세내용|
-|:---:|---|
-| 로그인 & 회원가입 | 회원 조회, 추가, 삭제, 수정 |
-| 작업 | 회원 조회, 추가, 삭제, 수정 |
-| 백로그 | 진행"완료"인 작업들의 모음 |
-| 대시보드 | 대시보드 추가, 삭제, 수정 |
-| 동료 | 동료 추가, 삭제, 조회 |
-| 캘린더 | 작업의 시작일을 캘린더의 표시, 작업 삭제 시 해당 작업을 캘린더에서 삭제 |
-
-<br><br>
-## 우리 프로젝트
-
-#### 회원가입
-<div style="text-align: center;">
-  <img width="1500" alt="image" src="https://github.com/user-attachments/assets/bbd5532f-40b5-4b95-a743-6d7f55261b30" />
-</div> 
-
 <br>
 
-#### 로그인
-<div style="text-align: center;">
-  <img width="1500" alt="image" src="https://github.com/user-attachments/assets/7e62ca95-2f4a-4737-9567-b0c485c3360c" />
-</div> 
+## 실행 및 개발 환경 구축 방법
 
-<br>
-
-#### 로그인 후 홈 화면
-<div style="text-align: center;">
-  <img width="1500" alt="image" src="https://github.com/user-attachments/assets/7e5d2cdd-be81-4175-a309-1ed5898b6470" />
-</div> 
-
-<br>
-
-#### 즐겨찾기
-<div style="text-align: center;">
-  <img width="1500" alt="image" src="https://github.com/user-attachments/assets/1164a4ff-192e-416a-b3fa-4be542c2cc83" />
-</div> 
-
-<br>
-
-#### 주식 정보
-<div style="text-align: center;">
-  <img width="1500" alt="image" src="https://github.com/user-attachments/assets/3bcdeda6-a765-41d2-b5d2-8041dfbb2d70" />
-</div> 
-
-<br>
-
-<br><br>
+### 🔧 백엔드 실행 방법
+1. Python 3.9 설치 ([https://www.python.org](https://www.python.org))
+2. 백엔드 디렉토리 이동 후 가상환경 생성:
+   ```bash
+   cd back/
+   python -m venv venv
+   source venv/bin/activate  # Windows는 venv\Scripts\activate
+   pip install -r requirements.txt
+3. MySQL에서 DB 생성
+    ```bash
+    CREATE DATABASE stock_data;
+4. 백엔드 서버 실행
+    ```bash
+    python app.py
+5. 웹 브라우저에서 확인
+    http://localhost:5000 접속
 
 
+### 💻 프론트엔드 실행 방법
+1. 프론트엔드 디렉토리 이동  
+   ```bash
+   cd front/
+2. HTML 파일 직접 실행
+→ login2.html 파일을 더블클릭하거나 브라우저에서 열기
+3. 또는 로컬 서버 실행
+python -m http.server 3000
+4. 웹 브라우저에서 확인
+http://localhost:3000/login2.html 접속
