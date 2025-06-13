@@ -63,8 +63,8 @@
             <option value="volume">거래량순</option>
             <option value="price">가격순</option>
         </select>
-        <label>새로고침:</label>
-        <select id="refresh-interval" onchange="setRefreshInterval()">
+        <label>새로고침 (임시):</label>
+        <select id="refresh-interval" onchange="setRefreshInterval()" title="현재 세션에서만 적용됩니다. 기본값 변경은 설정에서 하세요.">
             <option value="10">10초</option>
             <option value="30">30초</option>
             <option value="60">1분</option>
