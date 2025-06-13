@@ -84,7 +84,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         });
 
         const result = await response.json();
-        console.log('👀 /login response:', response.status, result);
+        console.log('👀 /login response status:', response.status);
+        console.log('👀 /login response data:', result);
+        console.log('👀 /login response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
             if (response.status === 400) {
@@ -101,11 +103,25 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             throw new Error('로그인 실패');
         }
 
-        // 로컬 상태 저장
-        localStorage.setItem('user_email', payload.user_email);
+        console.log('👀 Login result data:', result);
+
+        // 백엔드에서 받은 데이터 검증
+        if (!result.user_id || !result.user_email) {
+            throw new Error('서버에서 사용자 정보를 받지 못했습니다.');
+        }
+
+        // 로컬 상태 저장 - 백엔드에서 받은 실제 데이터 사용
+        localStorage.setItem('user_id', result.user_id);
+        localStorage.setItem('user_email', result.user_email);
+        localStorage.setItem('refresh_time', result.refresh_time || 0);
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('loginTime', Date.now().toString());
-        localStorage.setItem('user_id', payload.user_email); // user_id가 없으므로 임시로 email 사용
+
+        console.log('✅ 로그인 정보 저장 완료:', {
+            user_id: result.user_id,
+            user_email: result.user_email,
+            refresh_time: result.refresh_time
+        });
 
         await Swal.fire({
             icon: 'success',
