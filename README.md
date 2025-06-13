@@ -70,17 +70,8 @@
 ### 📁 DB 설정 정보
 
 - DB 엔진: MySQL 8.0.41  
-- 호스트: az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5.mysql.managed-service.kr-central-2.kakaocloud.com  
-- 포트: 3306  
-- 사용자: admin  
-- 비밀번호: admin1234  
 - DB 이름: capston  
 
-💡 사용 예시 (SQLAlchemy용):
-
-```bash
-mysql+pymysql://admin:admin1234@az-a.database-lsh.ae90ddc1b6dc4b0581bb44b31f8921b5.mysql.managed-service.kr-central-2.kakaocloud.com:3306/capston
-```
 
 ### 🔧 백엔드 실행 방법
 1. Python 3.9 설치 ([https://www.python.org](https://www.python.org))
