@@ -10,9 +10,9 @@
     --btn-bg: #007bff;
     --btn-hover: #0056b3;
     --favorite-color: #ccc;
-    --favorite-active: #ffc107;
-    --notification-color: #17a2b8;
-    --notification-active: #138496;
+    --favorite-active: #007bff;
+    --notification-color: #ccc;
+    --notification-active: #17a2b8;
     --sidebar-bg: #fff;
     --sidebar-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -29,9 +29,9 @@ body.dark-mode {
     --btn-bg: #1a73e8;
     --btn-hover: #1557b0;
     --favorite-color: #666;
-    --favorite-active: #ffb300;
-    --notification-color: #17a2b8;
-    --notification-active: #138496;
+    --favorite-active: #1a73e8;
+    --notification-color: #666;
+    --notification-active: #17a2b8;
     --sidebar-bg: #444;
     --sidebar-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -208,6 +208,17 @@ aside#sidebar li {
     color: var(--text-color);
     border-bottom: 1px solid #ddd;
     cursor: default;
+}
+
+aside#sidebar li a.company-name-clickable {
+    color: var(--btn-bg);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+aside#sidebar li a.company-name-clickable:hover {
+    color: var(--btn-hover);
+    text-decoration: underline;
 }
 
 body.dark-mode aside#sidebar li {
