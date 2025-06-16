@@ -93,11 +93,13 @@
 ### 💻 프론트엔드 실행 방법
 1. 프론트엔드 디렉토리 이동  
    ```bash
-   cd front/
-2. HTML 파일 직접 실행
-→ login2.html 파일을 더블클릭하거나 브라우저에서 열기
-3. 또는 로컬 서버 실행
-python -m http.server 3000
+   cd front/chaewon
+   
+2. Express 서버 실행 (필수)
+   node server.js
+   
 4. 웹 브라우저에서 확인
-http://localhost:3000/login2.html 접속
+ http://localhost:3000 접속
 
+⚠️ 주의: 백엔드 API 호출을 위해 Express 프록시 서버가 필요합니다.
+HTML 파일을 직접 열거나 python 서버로는 작동하지 않습니다.    
