@@ -85,7 +85,7 @@
    pip install flask flask-cors mysql-connector-python yfinance pandas numpy beautifulsoup4
 3. 백엔드 서버 실행
     ```bash
-    python app.py
+    python stock_api_server.py
 4. 웹 브라우저에서 확인
     http://localhost:8000 접속
 
