@@ -1,0 +1,3 @@
+function getMyName() {
+    return 'KimYunJin';
+}
